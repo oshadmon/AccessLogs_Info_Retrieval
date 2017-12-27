@@ -55,7 +55,7 @@ MacBook-Pro:CleanWordPressEngineAccessLog $ python3 locaton_genorator_main.py  -
 
 Output: 
 ```
-Oris-MacBook-Pro:ip_to_locaiton shadmonfamily$ cat sample.txt 
+MacBook-Pro:CleanWordPressEngineAccessLog $ cat sample.txt 
 173.13.145.225 -
 	Frequency: 2
 	Timestamps: 

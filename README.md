@@ -50,7 +50,7 @@ MacBook-Pro:CleanWordPressEngineAccessLog $ cat sample.txt
 
 Run Query: 
 ```
-MacBook-Pro:CleanWordPressEngineAccessLog $ python3 locaton_genorator_main.py  --file=$HOME/CleanWordPressEngineAccessLog/sample.txt --api-key=AIzaSyBkVEF5smFYx9fGp-WuxrxpDQXeLrVt-PA --query='Brunch' --radius=5
+MacBook-Pro:CleanWordPressEngineAccessLog $ python3 locaton_genorator_main.py  --file=$HOME/CleanWordPressEngineAccessLog/sample.txt --api-key=aaaBcD123kd-d83c-C83s --query='Brunch' --radius=5
 ```
 
 Output: 

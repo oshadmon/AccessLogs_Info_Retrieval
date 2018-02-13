@@ -1,9 +1,9 @@
 """
 By: Ori Shadmon 
-Date: December 2017 
-Description: The following piece of code takes the "Access Log" files from WP Engine, and retirves the following 
-- IP Address(es) and how frequently they visited 
-- Dates in which they visited 
+Date: February 2018 
+Description: The following piece of code takes the "Access Log" file and retirves the IP Addresses, and access dates. 
+It then usees the IP Addresses, and uses Google Maps and https://freegeoip.net/ to get location and its corresponding
+information.  
 """ 
 
 import datetime
@@ -17,7 +17,7 @@ import sys
 class Main: 
    def __init__(self, *args): 
       """
-      The following class controls the process by which everything runs
+      The following class controls the processes by which everything runs
       :args: 
          args  (sys.argv):list - Valules declared when calling test (shown in _help method)
       """
@@ -54,7 +54,7 @@ class Main:
 	                     that IP accessed the website
       """
       self.file = "$HOME/tmp/site_logs.txt"
-      self.api_key = "aaaBcD123kd-d83c-C83s"
+      self.api_key = "aaaBcD123kd-d83c-C83s" # The API Key is invalid, user must include a valid IP for code to work
       self.query = "lunch" 
       self.radius = 0
       self.timestamp = False
@@ -75,27 +75,22 @@ class Main:
             self._help(invalid=value)
       self.file = self.file.replace("$HOME", os.getenv("HOME")).replace("$PWD", os.getenv("PWD")).replace("~", os.path.expanduser('~'))
        
-   def print_data(self, data:dict={}): 
-      for ip in data:  
-         if self.timestamp is True: 
-            output ="%s -\n\tCoordiantes: %s\n\tFrequency: %s\n\tTimestamps: %s\n\tAddress: %s\n\tNear By Places: %s" 
-            output = output % (ip, data[ip]['coordinates'], len(data[ip]["timestamp"]), data[ip]["timestamp"], data[ip]["address"], data[ip]["owner"])
-            print(output)  
-         else: 
-            output ="%s -\n\tCoordinates, \n\tFrequency: %s\n\tAddress: %s\n\tNear By Places: %s"        
-            output = output % (ip, data[ip]['coordinates'], len(data[ip]["timestamp"]), data[ip]["address"], data[ip]["owner"]) 
-            print(output)
-
 
    def main(self): 
+      """
+      Main process for script
+      """
       iff = InfoFromFile(file=self.file) 
-      data = iff.itterate_file()
-      for ip in data:
+      data = iff.itterate_file() # Get Information from File
+
+      for ip in data: # Get other information
          li = LocationInfo(ip=ip, api_key=self.api_key, query=self.query, radius=self.radius)
-         lat, long = li._get_lat_long()
+         lat, long = li._get_lat_long() 
          coordinates = "(%s, %s)" % (str(lat), str(long))
          address = li._get_address(lat, long)
          owners = li._get_possible_owners(lat, long, self.query)
+
+         # Print output 
          if self.timestamp is True: 
             output = "%s -\n\tFrequency: %s\n\tTimestamp: %s\n\tCoordinates: %s\n\tAddress: %s\n\tPlaces: %s"
             print(output % (ip, len(data[ip]["timestamp"]), data[ip]["timestamp"], coordinates, address, owners))
@@ -110,6 +105,7 @@ class InfoFromFile:
       from it. 
       :args: 
          file:str - file containing lines of relevent data
+         self.data:dict - Object containing IP (key) and timestamps (value list)
       """    
       self.f = file 
       self.data = {}

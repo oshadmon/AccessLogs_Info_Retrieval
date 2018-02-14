@@ -20,8 +20,10 @@ The following project is intended to help users understand the location(s) from 
 # Help: 
 Oris-MacBook-Pro:AccessLogs_Info_Retrieval $ python3 merge_files.py 
 Error: Expect directory containing Access Logs
+
 Oris-MacBook-Pro:AccessLogs_Info_Retrieval $ python3 merge_files.py ~/Downloads/tmp/foglamp_2018-01-26-15-26-14-EA6B7463F0FAFB30.txt 
 Error: Expect directory containing Access Logs
+
 # Notice that if everything is working properly then the system will show which file contains the merged Access Logs
 Oris-MacBook-Pro:AccessLogs_Info_Retrieval $ python3 merge_files.py ~/Downloads/tmp
 Merged File: /Users/ori/Downloads/tmp/merged_file_2018_02_14_10_49_28.txt

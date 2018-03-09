@@ -9,6 +9,7 @@ information.
 import datetime
 import googlemaps
 import os
+import psycopg2
 from pygeocoder import Geocoder
 import re 
 import requests
@@ -24,7 +25,18 @@ class Main:
       if "--help" in sys.argv: 
          self._help()
       self._declare_values(values=sys.argv)
+      self._clean_ip_info_table()
 
+   def _clean_ip_info_table(self): 
+      """
+      truncate ip_info table 
+      """ 
+      conn = psycopg2.connect(host=self.host, user=self.usr, password=self.passwd, dbname=self.dbname)
+      conn.autocommit = True
+      c = conn.cursor()
+      c.execute("truncate ip_info;")
+      c.close()
+ 
    def _help(self, invalid:str=""):
       """
       Print options to screen and exit
@@ -39,6 +51,10 @@ class Main:
            +"\n\t--query: The type of location to check [--query=lunch]"
            +"\n\t--radius: In meters how far from source to check [--radius=0]"
            +"\n\t--timestamp:  Print a list the accessed timestamps per IP. If set to False (default), then print only the number of times that IP accessed the website"
+           +"\n\t--stdout: print to screen otherwise will just store to database (default false)" 
+           +"\n\t--host: IP address of the PostgresSQL [--host=127.0.0.1]"
+           +"\n\t--usr: User and password to connect to postgres [--usr=root:'']"
+           +"\n\t--db-name: Name of database being used [--db-name=test]"  
            ) 
       exit(1)
 
@@ -50,14 +66,25 @@ class Main:
          api_key:str - Google's API key to use Google Maps API (https://developers.google.com/maps/documentation/javascript/get-api-key)
          query:str - The type of location to check.
          radius:str - In meters how far from source to check 
-         timestamp:boolean - Print a list the accessed timestamps per IP. If set to False (default), then print only the number of times
+         timestamp:boolean - Return a list the accessed timestamps per IP. If set to False (default), then print only the number of times
 	                     that IP accessed the website
+         host:str - IP address of the PostgresSQL
+         user:str - User of the PostgresSQL  
+         pass:string - password of PostgresSQL user 
+         dbname:str - database name  
+         stdout:boolean - Print output to screen 
       """
       self.file = "$HOME/tmp/site_logs.txt"
       self.api_key = "aaaBcD123kd-d83c-C83s" # The API Key is invalid, user must include a valid IP for code to work
       self.query = "lunch" 
       self.radius = 0
       self.timestamp = False
+      self.host = '127.0.0.1' 
+      self.usr = 'root' 
+      self.passwd = '' 
+      self.dbname = 'test' 
+      self.stdout = False
+
       for value in values: 
          if value is sys.argv[0]: 
             pass 
@@ -71,18 +98,56 @@ class Main:
             self.radius = int(value.split("=")[-1]) 
          elif "--timestamp" in value: 
             self.timestamp = True
+         elif "--host" in value: 
+            self.host = str(value.split("=")[-1]) 
+         elif "--usr" in value: 
+            self.usr = str(value.split("=")[-1].split(":")[0]) 
+            self.passwd = str(value.split("=")[-1].split(":")[-1]) 
+         elif "--db-name" in value:
+            self.dbname = str(value.split("=")[-1]) 
+         elif "--stdout" in value: 
+            self.stdout = True 
          else: 
             self._help(invalid=value)
       self.file = self.file.replace("$HOME", os.getenv("HOME")).replace("$PWD", os.getenv("PWD")).replace("~", os.path.expanduser('~'))
        
-
+   def _sent_to_db(self, ip='127.0.0.1', frequency=1, timestamp='[]', coordinates='(0.0,0.0)', address='', owners=''): 
+      """
+      Implementation sending data to Postgres database rather print 
+      :args: 
+         ip:str - IP address 
+         frequency:int - how instances of the IP there are 
+         timestamp:list - A list (as string) of timestamp 
+         coordinates:list - coordiantes from which IP was accessed 
+         address:str - address of ip 
+         owners:str - potential list of owners 
+      """
+      stmt = stmt = "INSERT INTO ip_info VALUES ('%s', %s, '%s', '%s', '%s', '%s')" % (ip, frequency, timestamp, coordinates, address, owners) 
+      conn = psycopg2.connect(host=self.host, user=self.usr, password=self.passwd, dbname=self.dbname)
+      conn.autocommit = True 
+      c = conn.cursor() 
+      c.execute(stmt)
+      c.close() 
+   
+   def convert_timestamp(self, timestamps=[]) -> str: 
+      """
+      Convert a list of timestamps to a string of timestamps
+      :args:
+         timestamps:list - a list of timestamps
+      :return: 
+         a string of timestamps
+      """
+      output = "" 
+      for timestamp in timestamps: 
+            output += str(timestamp) +", "
+      return output
+   
    def main(self): 
       """
       Main process for script
       """
       iff = InfoFromFile(file=self.file) 
       data = iff.itterate_file() # Get Information from File
-
       for ip in data: # Get other information
          li = LocationInfo(ip=ip, api_key=self.api_key, query=self.query, radius=self.radius)
          lat, long = li._get_lat_long() 
@@ -90,14 +155,18 @@ class Main:
          address = li._get_address(lat, long)
          owners = li._get_possible_owners(lat, long, self.query)
 
-         # Print output 
-         if self.timestamp is True: 
-            output = "%s -\n\tFrequency: %s\n\tTimestamp: %s\n\tCoordinates: %s\n\tAddress: %s\n\tPlaces: %s"
-            print(output % (ip, len(data[ip]["timestamp"]), data[ip]["timestamp"], coordinates, address, owners))
-         else: 
-            output = "%s -\n\tFrequency: %s\n\tCoordinates: %s\n\tAddress: %s\n\tPlaces: %s"
-            print(output % (ip, len(data[ip]["timestamp"]), coordinates, address, owners))
+         # Send to database
+         self._sent_to_db(ip=ip, frequency=len(data[ip]["timestamp"]), timestamp=self.convert_timestamp(data[ip]["timestamp"]), coordinates=coordinates, address=address, owners=owners.replace("'","")) 
 
+         # Print to screen 
+         if self.stdout is True: 
+            if self.timestamp is True: 
+               output = "%s -\n\tFrequency: %s\n\tTimestamp: %s\n\tCoordinates: %s\n\tAddress: %s\n\tPlaces: %s"
+               print(output % (ip, len(data[ip]["timestamp"]), data[ip]["timestamp"], coordinates, address, owners))
+            else: 
+               output = "%s -\n\tFrequency: %s\n\tCoordinates: %s\n\tAddress: %s\n\tPlaces: %s"
+               print(output % (ip, len(data[ip]["timestamp"]), coordinates, address, owners))
+  
 class InfoFromFile: 
    def __init__(self, file:str="$HOME/tmp/s3_file.txt"): 
       """
@@ -121,9 +190,10 @@ class InfoFromFile:
          ip = self._get_ip(line)
          timestamp = self._get_timestamp(line)
          if ip in self.data and timestamp not in self.data[ip]: 
-            self.data[ip]["timestamp"].append(self._get_timestamp(line))
+            if timestamp not in self.data[ip]["timestamp"]: 
+               self.data[ip]["timestamp"].append(timestamp)
          elif ip not in self.data: 
-            self.data[ip]={"timestamp":[self._get_timestamp(line)]}
+            self.data[ip]={"timestamp":[timestamp]}
       f.close()
       return self.data 
 
@@ -146,14 +216,13 @@ class InfoFromFile:
       :return:
          the derived timestamp
       """
-      original_date = line.split("[")[-1].split("]")[0].split(" +")[0].split(":",1)[0]
-      original_time = line.split("[")[-1].split("]")[0].split(" +")[0].split(":",1)[-1]
+      timestamp = line.split("[")[-1].split("]")[0].split(" +")[0].split(":",1)[0]
       try:
-         timestamp = datetime.datetime.strptime(original_date, "%d/%b/%Y").strftime("%Y-%m-%d")
+         timestamp = datetime.datetime.strptime(timestamp, "%d/%b/%Y").strftime("%Y-%m-%d")
       except ValueException:
-         return(original_date + " " + original_time)
+         return timestamp
       else:
-         return(timestamp + " " + original_time)
+         return timestamp
 
 class LocationInfo: 
    def __init__(self, ip:str='127.0.0.1', api_key:str='aaabbbcccdddeee1112_123fg', query:str='lunch', radius:int=0): 

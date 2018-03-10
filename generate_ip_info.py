@@ -111,7 +111,7 @@ class Main:
             self._help(invalid=value)
       self.file = self.file.replace("$HOME", os.getenv("HOME")).replace("$PWD", os.getenv("PWD")).replace("~", os.path.expanduser('~'))
        
-   def _sent_to_db(self, ip='127.0.0.1', frequency=1, timestamp='[]', coordinates='(0.0,0.0)', address='', owners=''): 
+   def _sent_to_db(self, data={}): 
       """
       Implementation sending data to Postgres database rather print 
       :args: 
@@ -122,7 +122,10 @@ class Main:
          address:str - address of ip 
          owners:str - potential list of owners 
       """
-      stmt = stmt = "INSERT INTO ip_info VALUES ('%s', %s, '%s', '%s', '%s', '%s')" % (ip, frequency, timestamp, coordinates, address, owners) 
+      total_access = 0
+      for ip in data: 
+         total_access += len(data[ip]["timestamp"])
+      stmt = "INSERT INTO historical_data(total_access, unique_access, ip_info_table, from_where) VALUES (%s, %s, '%s', 'AWS')' % (total_access, len(data.keys()), data) 
       conn = psycopg2.connect(host=self.host, user=self.usr, password=self.passwd, dbname=self.dbname)
       conn.autocommit = True 
       c = conn.cursor() 
@@ -151,12 +154,12 @@ class Main:
       for ip in data: # Get other information
          li = LocationInfo(ip=ip, api_key=self.api_key, query=self.query, radius=self.radius)
          lat, long = li._get_lat_long() 
-         coordinates = "(%s, %s)" % (str(lat), str(long))
-         address = li._get_address(lat, long)
-         owners = li._get_possible_owners(lat, long, self.query)
+         data[ip]["coordinates"] = "(%s, %s)" % (str(lat), str(long))
+         data[ip]["address"] = li._get_address(lat, long)
+         data[ip]["owners"] = li._get_possible_owners(lat, long, self.query)
 
          # Send to database
-         self._sent_to_db(ip=ip, frequency=len(data[ip]["timestamp"]), timestamp=self.convert_timestamp(data[ip]["timestamp"]), coordinates=coordinates, address=address, owners=owners.replace("'","")) 
+         self._sent_to_db(data=data) 
 
          # Print to screen 
          if self.stdout is True: 
@@ -220,9 +223,9 @@ class InfoFromFile:
       try:
          timestamp = datetime.datetime.strptime(timestamp, "%d/%b/%Y").strftime("%Y-%m-%d")
       except ValueException:
-         return timestamp
+         return str(timestamp).replace("'","").replace('"','')
       else:
-         return timestamp
+         return str(timestamp).replace("'","").replace('"','')
 
 class LocationInfo: 
    def __init__(self, ip:str='127.0.0.1', api_key:str='aaabbbcccdddeee1112_123fg', query:str='lunch', radius:int=0): 

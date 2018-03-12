@@ -115,7 +115,7 @@ class Main:
       for ip in data.keys(): 
          total_access += len(data[ip]['timestamp']) 
 
-      stmt = "INSERT INTO historical_data(total_access, unique_access, ip_info_table) VALUES (%s, %s, '%s')" 
+      stmt = "INSERT INTO historical_data(total_access, unique_access, ip_info) VALUES (%s, %s, '%s')" 
       stmt = stmt % (total_access, len(data.keys()), data) 
       stmt = stmt.replace("'",'"').replace('"{',"'{").replace('}"', "}'").replace("AWS",'AWS')
       conn = psycopg2.connect(host=self.host, user=self.usr, password=self.passwd, dbname=self.dbname)

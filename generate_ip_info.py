@@ -25,18 +25,7 @@ class Main:
       if "--help" in sys.argv: 
          self._help()
       self._declare_values(values=sys.argv)
-      self._clean_ip_info_table()
 
-   def _clean_ip_info_table(self): 
-      """
-      truncate ip_info table 
-      """ 
-      conn = psycopg2.connect(host=self.host, user=self.usr, password=self.passwd, dbname=self.dbname)
-      conn.autocommit = True
-      c = conn.cursor()
-      c.execute("truncate ip_info;")
-      c.close()
- 
    def _help(self, invalid:str=""):
       """
       Print options to screen and exit
@@ -111,7 +100,7 @@ class Main:
             self._help(invalid=value)
       self.file = self.file.replace("$HOME", os.getenv("HOME")).replace("$PWD", os.getenv("PWD")).replace("~", os.path.expanduser('~'))
        
-   def _sent_to_db(self, data={}): 
+   def _sent_to_historical_data(self, data={}): 
       """
       Implementation sending data to Postgres database rather print 
       :args: 
@@ -123,9 +112,12 @@ class Main:
          owners:str - potential list of owners 
       """
       total_access = 0
-      for ip in data: 
-         total_access += len(data[ip]["timestamp"])
-      stmt = "INSERT INTO historical_data(total_access, unique_access, ip_info_table, from_where) VALUES (%s, %s, '%s', 'AWS')' % (total_access, len(data.keys()), data) 
+      for ip in data.keys(): 
+         total_access += len(data[ip]['timestamp']) 
+
+      stmt = "INSERT INTO historical_data(total_access, unique_access, ip_info_table) VALUES (%s, %s, '%s')" 
+      stmt = stmt % (total_access, len(data.keys()), data) 
+      stmt = stmt.replace("'",'"').replace('"{',"'{").replace('}"', "}'").replace("AWS",'AWS')
       conn = psycopg2.connect(host=self.host, user=self.usr, password=self.passwd, dbname=self.dbname)
       conn.autocommit = True 
       c = conn.cursor() 
@@ -152,6 +144,7 @@ class Main:
       iff = InfoFromFile(file=self.file) 
       data = iff.itterate_file() # Get Information from File
       for ip in data: # Get other information
+         print(data[ip])
          li = LocationInfo(ip=ip, api_key=self.api_key, query=self.query, radius=self.radius)
          lat, long = li._get_lat_long() 
          data[ip]["coordinates"] = "(%s, %s)" % (str(lat), str(long))
@@ -159,7 +152,7 @@ class Main:
          data[ip]["owners"] = li._get_possible_owners(lat, long, self.query)
 
          # Send to database
-         self._sent_to_db(data=data) 
+         self._sent_to_historical_data(data=data)
 
          # Print to screen 
          if self.stdout is True: 
@@ -223,9 +216,9 @@ class InfoFromFile:
       try:
          timestamp = datetime.datetime.strptime(timestamp, "%d/%b/%Y").strftime("%Y-%m-%d")
       except ValueException:
-         return str(timestamp).replace("'","").replace('"','')
+         return timestamp
       else:
-         return str(timestamp).replace("'","").replace('"','')
+         return timestamp
 
 class LocationInfo: 
    def __init__(self, ip:str='127.0.0.1', api_key:str='aaabbbcccdddeee1112_123fg', query:str='lunch', radius:int=0): 
@@ -297,7 +290,7 @@ class LocationInfo:
          return "Failed to get potential %s places due to API Key timeout. For more info: https://developers.google.com/maps/documentation/javascript/get-api-key" % query 
       else: 
          for dict in places['results']:
-            result += dict['name'] + ", "
+            result += dict['name'].replace("'","") + ", "
          return result
 
 

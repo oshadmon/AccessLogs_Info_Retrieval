@@ -11,3 +11,5 @@ CREATE TABLE historical_data(
 	   PRIMARY KEY(id)
 );
 
+INSERT INTO historical_data(total_access, unique_access) VALUES (0, 0); 
+

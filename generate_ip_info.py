@@ -276,7 +276,10 @@ class LocationInfo:
       except googlemaps.exceptions.Timeout: 
          return "Failed to get Address due to API Key timeout. For more info: https://developers.google.com/maps/documentation/javascript/get-api-key"
       else: 
-         return address[0]['formatted_address']
+         try:
+            return address[0]['formatted_address']
+         except:
+            return ''
 
    def _get_possible_places(self, lat:float=0.0, long:float=0.0, query:str="lunch") -> str:
       """

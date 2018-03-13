@@ -1,3 +1,4 @@
+#!/bin/bash
 # Installation requirments code 
 apt-get install update 
 # Postgres

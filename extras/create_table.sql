@@ -3,7 +3,7 @@ DROP TABLE historical_data;
 -- Table containing summary of historical information
 CREATE TABLE historical_data(
 	   id SERIAL,
-	   update_timestamp  TIMESTAMP DEFAULT now(),
+	   update_timestamp  DATE DEFAULT now(),
 	   total_access INT NOT NULL DEFAULT 0, -- Total Number of accessed  
 	   unique_access INT NOT NULL DEFAULT 0, -- Total number of unique accessed 
            ip_info JSONB NOT NULL DEFAULT '{}'::jsonb, -- copy dict with information regarding everyone that accessed

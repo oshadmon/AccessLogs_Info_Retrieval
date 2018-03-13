@@ -10,11 +10,21 @@ import sys
 
 class GitHub: 
    def __init__(self, *args):
+      """
+      Using GitHub connection parameters communicate retrive insight 
+      :args: 
+         args  (sys.argv):list - Valules declared when calling test (shown in _help method)
+      """
       if "--help" in sys.argv:
          self._help()
       self._declare_values(values=sys.argv)
    
    def _help(self, invalid=''): 
+      """
+      Print options to screen and exit
+      :args: 
+         invalid:str - If the user wants an option that isn't supported, then a corresponding error is printed 
+      """
       if invalid is not '': 
          print("Exception - '%s' is not supported \n\t" % invalid) 
       print("Option List:"
@@ -25,8 +35,14 @@ class GitHub:
       )
 
    def _declare_values(self, values=[]):
-      self.user='user@github.com'
-      self.passwd='password'
+      """
+      Declare necessery values
+      :args: 
+         self.auth:str -  github authentication infromation (user, password)
+         self.org:str - organization under whcih repository exists, if no such org tha uses username 
+         self.repo:str - repository which insight is relevent to 
+         self.base_dir:str - base GitHub URL
+      """
       self.auth=(self.user, self.passwd)
       self.org='user'
       self.repo='NewRepo' 
@@ -47,11 +63,21 @@ class GitHub:
             self._help(invalid=value)
 
    def get_traffic(self) -> dict:
+      """
+      Retrive insight regarding traffic 
+      :return: 
+         dict with information regarding traffic 
+      """
       base_url = self.base_url + self.org + '/' + self.repo + '/traffic/views'
       response = requests.get(base_url, auth=self.auth, headers={'Accept': 'application/vnd.github.spiderman-preview'})
       return response.json() 
    
    def get_clones(self) -> dict:
+      """
+      Retrive insight regarding clone
+      :return: 
+         dict with information regading clones
+      """
       base_url = self.base_url + self.org + '/' + self.repo + '/traffic/clones'
       response = requests.get(base_url, auth=self.auth, headers={'Accept': 'application/vnd.github.spiderman-preview'})
       return respons.json() 

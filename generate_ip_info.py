@@ -10,10 +10,13 @@ import datetime
 import googlemaps
 import os
 import psycopg2
-from pygeocoder import Geocoder
 import re 
 import requests
 import sys 
+
+from extras.retrieve_from_github import GitHub
+from json import dumps 
+from pygeocoder import Geocoder
 
 class Main: 
    def __init__(self, *args): 
@@ -100,7 +103,7 @@ class Main:
             self._help(invalid=value)
       self.file = self.file.replace("$HOME", os.getenv("HOME")).replace("$PWD", os.getenv("PWD")).replace("~", os.path.expanduser('~'))
        
-   def _sent_to_historical_data(self, data={}): 
+   def _sent_to_historical_data(self, data={}, total_access=0, unique_access=0, source=''): 
       """
       Implementation sending data to Postgres database rather print 
       :args: 
@@ -111,12 +114,8 @@ class Main:
          address:str - address of ip 
          places:str - potential list of places 
       """
-      total_access = 0
-      for ip in data.keys(): 
-         total_access += data[ip]["frequency"]
-      stmt = "INSERT INTO historical_data(total_access, unique_access, ip_info) VALUES (%s, %s, '%s')" 
-      stmt = stmt % (total_access, len(data.keys()), data) 
-      stmt = stmt.replace("'",'"').replace('"{',"'{").replace('}"', "}'").replace("AWS",'AWS')
+      stmt = "INSERT INTO historical_data(total_access, unique_access, ip_info, from_where) VALUES (%s, %s, '%s', '%s')" 
+      stmt = stmt % (total_access, unique_access, dumps(data), source) 
       conn = psycopg2.connect(host=self.host, user=self.usr, password=self.passwd, dbname=self.dbname)
       conn.autocommit = True 
       c = conn.cursor() 
@@ -136,24 +135,23 @@ class Main:
             output += str(timestamp) +", "
       return output
    
-   def main(self): 
+   def aws_main(self): 
       """
       Main process for script
       """
       iff = InfoFromFile(file=self.file) 
       tmp = iff.itterate_file() # Get Information from File
       data = {} 
+      total_access=0 
       for ip in tmp: # Get other information
          li = LocationInfo(ip=ip, api_key=self.api_key, query=self.query, radius=self.radius)
          lat, long = li._get_lat_long() 
          coordinates = "(%s, %s)" % (str(lat), str(long))
          address = li._get_address(lat, long)
          places = li._get_possible_places(lat, long, self.query)
-         timestamps=""
-         for t in tmp[ip]["timestamp"]: 
-            timestamps += t+", "
-       
-         data[ip] = {"frequency": len(tmp[ip]["timestamp"]), "timestamp":timestamps, "coordinates":coordinates, 
+         total_access += len(tmp[ip]["timestamp"])
+ 
+         data[ip] = {"frequency": len(tmp[ip]["timestamp"]), "timestamp":self.convert_timestamp(tmp[ip]["timestamp"]), "coordinates":coordinates, 
                      "address":address, "places": places} 
          # Print to screen 
          if self.stdout is True: 
@@ -164,14 +162,16 @@ class Main:
                output = "%s -\n\tFrequency: %s\n\tCoordinates: %s\n\tAddress: %s\n\tPlaces: %s"
                print(output % (ip, len(data[ip]["timestamp"]), coordinates, address, places))
 
-
       # Send to database
-      self._sent_to_historical_data(data=data)
+      self._sent_to_historical_data(data=data, total_access=total_access, unique_access=len(data.keys()), source='AWS')
 
+   def github_main(): 
+      data, unique,count=retrive_github_info(auth=('user@github.com', 'password'), org='user', repo='NewRepo') 
+     
 class InfoFromFile: 
    def __init__(self, file:str="$HOME/tmp/s3_file.txt"): 
       """
-      The following class takes a file, and retrives the IP and access timestamps
+      The following class takes a file, and retrieves the IP and access timestamps
       from it. 
       :args: 
          file:str - file containing lines of relevent data
@@ -301,7 +301,24 @@ class LocationInfo:
             result += dict['name'].replace("'","").replace('"',"") + ", "
          return result
 
+def retrive_github_info(auth=('user@github.com', 'password'), org='user', repo='NewRepo') -> (dict, int, int):
+   """
+   Derive relevent information from github insight
+   :args: 
+      auth:str - authentication information (username/password) 
+      org:str - organization repo is under. If not stated then script automatically assumes that username is org name 
+      repo:str - repository name 
+   :return: 
+      1. Return dict with traffic, clone, and referrel info 
+      2. Return number of distinct clones 
+      3. Return total number of clones  
+   """
+   gh =  GitHub(auth=auth, org=org, repo=repo)  
+   data = {"traffic": gh.get_traffic(), "clones": gh.get_clones(), "referreral": gh.get_referreral()}  
+   return data, data['clones']['uniques'], data['clones']['count'] 
+            
+
 
 if __name__ == "__main__": 
    m = Main() 
-   m.main()
+   m.aws_main()

@@ -46,3 +46,14 @@ class GitHub:
       response = get(base_url, auth=self.auth, headers={'Accept': 'application/vnd.github.spiderman-preview'})
       return response.json() 
 
+   def get_referreral(self) -> dict: 
+      """
+      Retrieve insight regarding referrerals 
+      :return: 
+         dict with information regarding referrals 
+      """
+      base_url = self.base_url + self.org + '/' + self.repo + '/traffic/popular/referrers'
+      response = get(base_url, auth=self.auth, headers={'Accept': 'application/vnd.github.spiderman-preview'})
+      return response.json()
+
+

@@ -242,7 +242,7 @@ class LocationInfo:
       self.radius = radius
       # default values for latitude and longitude 
       self.lat = 0.0
-      self.lon = 0.0
+      self.long = 0.0
 
 
    def get_lat_long(self)->str: 
@@ -257,8 +257,8 @@ class LocationInfo:
       json_response = r.json()
       if json_response['latitude'] and json_response['longitude']:
          self.at = json_response['latitude']
-         self.lon = json_response['longitude']
-      return "(%s, %s)" % (str(self.lat), str(self.lon))
+         self.long = json_response['longitude']
+      return "(%s, %s)" % (str(self.lat), str(self.long))
 
    def _get_address(self) -> str: 
       """
@@ -269,7 +269,7 @@ class LocationInfo:
          return location address
       """
       try: 
-         address = self.gmaps.reverse_geocode((self.lat, self.lon))
+         address = self.gmaps.reverse_geocode((self.lat, self.long))
       except googlemaps.exceptions._RetriableRequest: 
          return "Failed to get Address due to API Key limit. For more info: https://developers.google.com/maps/documentation/javascript/get-api-key" 
       except googlemaps.exceptions.Timeout: 
@@ -289,7 +289,7 @@ class LocationInfo:
       """
       result = ""
       try: 
-         places = self.gmaps.places(query=self.query, location=(self.lat, self.lon), radius=self.radius)
+         places = self.gmaps.places(query=self.query, location=(self.lat, self.long), radius=self.radius)
       except googlemaps.exceptions as e: 
          return "Failed to get potential %s places due to API Key limit. For more info: https://developers.google.com/maps/documentation/javascript/get-api-key" % query
       except ooglemaps.exceptions.Timeout:

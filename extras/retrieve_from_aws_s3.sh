@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# The following iterates through S3 bucket and retrives information from it. All the information in a given bucket is then stored into a single file 
+# The following iterates through S3 bucket and retrieves information from it. All the information in a given bucket is then stored into a single file 
 
 if [ -z "${1}" ]
 then 
-   echo "Missing S3 Bucket URL [ex. bash extras/retrive_from_aws_s3.sh s3://website-analytics]" 
+   echo "Missing S3 Bucket URL [ex. bash extras/retrieve_from_aws_s3.sh s3://website-analytics]" 
    exit 1 
 fi 
  

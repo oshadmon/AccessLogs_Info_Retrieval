@@ -23,7 +23,7 @@ Alternatively one can run ```sudo bash $HOME/AccessLogs_Info_Retrieval/extras/in
 ```
 ubuntu:~/AccessLogs_Info_Retrieval$ python3 generate_ip_info.py  --help 
 Option List: 
-	--file: log file containing relevant information [--file=$HOME/tmp/site_logs.txt]
+	--file: log file containing relevent information [--file=$HOME/tmp/site_logs.txt]
 	--api-key: Google's API key to use Google Maps API [--api-key=aaaBcD123kd-d83c-C83s]
 	--query: The type of location to check [--query=lunch]
 	--radius: In meters how far from source to check [--radius=0]
@@ -32,4 +32,7 @@ Option List:
 	--host: IP address of the PostgresSQL [--host=127.0.0.1]
 	--usr: User and password to connect to postgres [--usr=root:'']
 	--db-name: Name of database being used [--db-name=test]
+	--git-usr: Usernamne and password to access git [--git-usr='user@github.com':'password']
+	--git-org: Organization under which repository exists [--git-org='user']
+	--git-repo: Repository name [--git-repo=NewRepo]
 ```

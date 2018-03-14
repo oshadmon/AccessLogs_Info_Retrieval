@@ -20,8 +20,7 @@ from pygeocoder import Geocoder
 
 class Main: 
    def __init__(self, *args): 
-      """
-      The following class controls the processes by which everything runs
+      """The following class controls the processes by which everything runs
       :args: 
          args  (sys.argv):list - Valules declared when calling test (shown in _help method)
       """
@@ -30,8 +29,7 @@ class Main:
       self._declare_values(values=sys.argv)
 
    def _help(self, invalid:str=""):
-      """
-      Print options to screen and exit
+      """Print options to screen and exit
       :args: 
          invalid:str - If the user wants an option that isn't supported, then a corresponding error is printed 
       """ 
@@ -48,12 +46,13 @@ class Main:
            +"\n\t--usr: User and password to connect to postgres [--usr=root:'']"
            +"\n\t--db-name: Name of database being used [--db-name=test]"  
            +"\n\t--git-usr: Usernamne and password to access git [--git-usr='user@github.com':'password']"
+           +"\n\t--git-org: Organization under which repository exists [--git-org='user']"
+           +"\n\t--git-repo: Repository name [--git-repo=NewRepo]"
            ) 
       exit(1)
 
    def _declare_values(self, values:list=[]): 
-      """
-      Declare values that are used through the program
+      """Declare values that are used through the program
       :args:
          file:str - File logs file containing relevent information
          api_key:str - Google's API key to use Google Maps API (https://developers.google.com/maps/documentation/javascript/get-api-key)
@@ -66,7 +65,9 @@ class Main:
          pass:string - password of PostgresSQL user 
          dbname:str - database name  
          stdout:boolean - Print output to screen 
-auth=('user@github.com', 'password'), org='user', repo='NewRepo'
+         auth:str - github authentication ('user@github.com', 'password') 
+         org:str -  organization name 
+         repo:str - Repository name 
       """
       self.file = "$HOME/tmp/site_logs.txt"
       self.api_key = "aaaBcD123kd-d83c-C83s" # The API Key is invalid, user must include a valid IP for code to work
@@ -118,8 +119,7 @@ auth=('user@github.com', 'password'), org='user', repo='NewRepo'
       self.file = self.file.replace("$HOME", os.getenv("HOME")).replace("$PWD", os.getenv("PWD")).replace("~", os.path.expanduser('~'))
        
    def _sent_to_historical_data(self, data={}, total_access=0, unique_access=0, source=''): 
-      """
-      Implementation sending data to Postgres database rather print 
+      """Implementation sending data to Postgres database rather print 
       :args: 
          ip:str - IP address 
          frequency:int - how instances of the IP there are 
@@ -137,8 +137,7 @@ auth=('user@github.com', 'password'), org='user', repo='NewRepo'
       c.close() 
    
    def convert_timestamp(self, timestamps=[]) -> str: 
-      """
-      Convert a list of timestamps to a string of timestamps
+      """Convert a list of timestamps to a string of timestamps
       :args:
          timestamps:list - a list of timestamps
       :return: 
@@ -150,9 +149,7 @@ auth=('user@github.com', 'password'), org='user', repo='NewRepo'
       return output
    
    def aws_main(self): 
-      """
-      Main process for script
-      """
+      """Retrieve information regarding AWS, send it to database; if valid, print the results"""
       iff = InfoFromFile(file=self.file) 
       tmp = iff.itterate_file() # Get Information from File
       data = {} 
@@ -182,7 +179,11 @@ auth=('user@github.com', 'password'), org='user', repo='NewRepo'
       self._sent_to_historical_data(data=data, total_access=total_access, unique_access=len(data.keys()), source='AWS')
 
    def github_main(self): 
-      tmp, unique,count=retrive_github_info(auth=self.auth, org=self.org, repo=self.repo) 
+      """
+      Retrieve information regarding GitHub, and send it to database
+      If valid, print relevent information
+      """
+      tmp, unique,count=retrieve_github_info(auth=self.auth, org=self.org, repo=self.repo) 
 
       data={'referral':{'count':tmp['referral'][0]['count'], 'unique':tmp['referral'][0]['uniques'], 'refferer':tmp['referral'][0]['referrer']},
             'clones':{'count':tmp['clones']['count'], 'unique':tmp['clones']['uniques']}, 'traffic':{'count':tmp['traffic']['count'], 'unique':tmp['traffic']['uniques']}}
@@ -195,8 +196,14 @@ auth=('user@github.com', 'password'), org='user', repo='NewRepo'
                        data['traffic']['count'], data['traffic']['unique'], 
                        data['referral']['count'], data['referral']['unique'], tmp['referral'][0]['referrer'])
          print(stmt) 
+
    def main(self): 
+      """
+      Main
+      """
+      # AWS 
       self.aws_main() 
+      # GitHub
       self.github_main() 
 
 class InfoFromFile: 
@@ -231,7 +238,7 @@ class InfoFromFile:
 
    def _get_ip(self, line:str="")->str: 
       """
-      Retrive IP address from line
+      Retrieve IP address from line
       :args:
          line containing IP address
       :return: 
@@ -242,7 +249,7 @@ class InfoFromFile:
 
    def _get_timestamp(self, line:str="")->str:
       """
-      Retrive timestamp from line 
+      Retrieve timestamp from line 
       :args:
          line containing timestamp
       :return:
@@ -323,16 +330,14 @@ class LocationInfo:
       result = ""
       try: 
          places = self.gmaps.places(query=self.query, location=(lat, long), radius=self.radius)
-      except googlemaps.exceptions as e: 
+      except: 
          return "Failed to get potential %s places due to API Key limit. For more info: https://developers.google.com/maps/documentation/javascript/get-api-key" % query
-      except ooglemaps.exceptions.Timeout:
-         return "Failed to get potential %s places due to API Key timeout. For more info: https://developers.google.com/maps/documentation/javascript/get-api-key" % query 
       else: 
          for dict in places['results']:
             result += dict['name'].replace("'","").replace('"',"") + ", "
          return result
 
-def retrive_github_info(auth=('user@github.com', 'password'), org='user', repo='NewRepo') -> (dict, int, int):
+def retrieve_github_info(auth=('user@github.com', 'password'), org='user', repo='NewRepo') -> (dict, int, int):
    """
    Derive relevent information from github insight
    :args: 

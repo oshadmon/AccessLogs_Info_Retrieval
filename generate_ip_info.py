@@ -10,10 +10,13 @@ import datetime
 import googlemaps
 import os
 import psycopg2
-from pygeocoder import Geocoder
 import re 
 import requests
 import sys 
+
+from extras.retrieve_from_github import GitHub
+from json import dumps 
+from pygeocoder import Geocoder
 
 class Main: 
    def __init__(self, *args): 
@@ -44,6 +47,7 @@ class Main:
            +"\n\t--host: IP address of the PostgresSQL [--host=127.0.0.1]"
            +"\n\t--usr: User and password to connect to postgres [--usr=root:'']"
            +"\n\t--db-name: Name of database being used [--db-name=test]"  
+           +"\n\t--git-usr: Usernamne and password to access git [--git-usr='user@github.com':'password']"
            ) 
       exit(1)
 
@@ -54,7 +58,7 @@ class Main:
          file:str - File logs file containing relevent information
          api_key:str - Google's API key to use Google Maps API (https://developers.google.com/maps/documentation/javascript/get-api-key)
          query:str - The type of location to check.
-         radius:int - In meters how far from source to check 
+         radius:str - In meters how far from source to check 
          timestamp:boolean - Return a list the accessed timestamps per IP. If set to False (default), then print only the number of times
 	                     that IP accessed the website
          host:str - IP address of the PostgresSQL
@@ -62,6 +66,7 @@ class Main:
          pass:string - password of PostgresSQL user 
          dbname:str - database name  
          stdout:boolean - Print output to screen 
+auth=('user@github.com', 'password'), org='user', repo='NewRepo'
       """
       self.file = "$HOME/tmp/site_logs.txt"
       self.api_key = "aaaBcD123kd-d83c-C83s" # The API Key is invalid, user must include a valid IP for code to work
@@ -73,8 +78,12 @@ class Main:
       self.passwd = '' 
       self.dbname = 'test' 
       self.stdout = False
+      
+      # GitHub requirments 
+      self.auth=('user@github.com', 'password')
+      self.org=None 
+      self.repo='NewRepo' 
 
-      # Based on command line args set corresponding values 
       for value in values: 
          if value is sys.argv[0]: 
             pass 
@@ -97,34 +106,37 @@ class Main:
             self.dbname = str(value.split("=")[-1]) 
          elif "--stdout" in value: 
             self.stdout = True 
+         elif "--git-usr" in value: 
+            self.auth = (str(value.split("=")[-1].split(":")[0]), str(value.split("=")[-1].split(":")[-1])) 
+         elif "--git-org" in value: 
+            self.org = str(value.split("=")[-1]) 
+         elif "--git-repo" in value: 
+            self.repo = str(value.split("=")[-1])
          else: 
             self._help(invalid=value)
-      
-      # For cases where command line arg uses ~/ or $HOME/ convert to full path 
+
       self.file = self.file.replace("$HOME", os.getenv("HOME")).replace("$PWD", os.getenv("PWD")).replace("~", os.path.expanduser('~'))
        
-   def _sent_to_historical_data(self, data={}): 
+   def _sent_to_historical_data(self, data={}, total_access=0, unique_access=0, source=''): 
       """
       Implementation sending data to Postgres database rather print 
       :args: 
-         data:dir - dictionary with information 
+         ip:str - IP address 
+         frequency:int - how instances of the IP there are 
+         timestamp:list - A list (as string) of timestamp 
+         coordinates:list - coordiantes from which IP was accessed 
+         address:str - address of ip 
+         places:str - potential list of places 
       """
-      # Total accessed is the sum of all frequencies 
-      total_access = 0
-      for ip in data.keys(): 
-         total_access += data[ip]["frequency"]
-      
-      # Insert relevent information into database.
-      stmt = "INSERT INTO historical_data(total_access, unique_access, ip_info) VALUES (%s, %s, '%s')" 
-      stmt = stmt % (total_access, len(data.keys()), data) 
-      stmt = stmt.replace("'",'"').replace('"{',"'{").replace('}"', "}'").replace("AWS",'AWS')
+      stmt = "INSERT INTO historical_data(total_access, unique_access, ip_info, from_where) VALUES (%s, %s, '%s', '%s')" 
+      stmt = stmt % (total_access, unique_access, dumps(data), source) 
       conn = psycopg2.connect(host=self.host, user=self.usr, password=self.passwd, dbname=self.dbname)
       conn.autocommit = True 
       c = conn.cursor() 
       c.execute(stmt)
       c.close() 
    
-   def _convert_timestamp(self, timestamps=[]) -> str: 
+   def convert_timestamp(self, timestamps=[]) -> str: 
       """
       Convert a list of timestamps to a string of timestamps
       :args:
@@ -137,26 +149,28 @@ class Main:
             output += str(timestamp) +", "
       return output
    
-   def main(self): 
+   def aws_main(self): 
       """
       Main process for script
       """
-      iff = InfoFromFile(file_name=self.file) 
+      iff = InfoFromFile(file=self.file) 
       tmp = iff.itterate_file() # Get Information from File
       data = {} 
-      for ip in tmp: 
-         # Retrive and format information that should be stored per IP 
+      total_access=0 
+      for ip in tmp: # Get other information
          li = LocationInfo(ip=ip, api_key=self.api_key, query=self.query, radius=self.radius)
-         coordinates = li.get_lat_long()
-         address = li._get_address()
-         places = li._get_possible_places()
-         timestamps = self._convert_timestamp(timestamps=tmp[ip]["timestamp"])
-         
-         # In data dict store a dict with relevent infromation where IP are keys 
-         data[ip] = {"frequency": len(tmp[ip]["timestamp"]), "timestamp":timestamps, "coordinates":coordinates, "address":address, "places": places} 
+         lat, long = li._get_lat_long() 
+         coordinates = "(%s, %s)" % (str(lat), str(long))
+         address = li._get_address(lat, long)
+         places = li._get_possible_places(lat, long, self.query)
+         total_access += len(tmp[ip]["timestamp"])
+ 
+         data[ip] = {"frequency": len(tmp[ip]["timestamp"]), "timestamp":self.convert_timestamp(tmp[ip]["timestamp"]), "coordinates":coordinates, 
+                     "address":address, "places": places} 
 
          # Print to screen 
          if self.stdout is True: 
+            print("AWS Download Info") 
             if self.timestamp is True: 
                output = "%s -\n\tFrequency: %s\n\tTimestamp: %s\n\tCoordinates: %s\n\tAddress: %s\n\tPlaces: %s"
                print(output % (ip, len(data[ip]["timestamp"]), data[ip]["timestamp"], coordinates, address, places))
@@ -164,25 +178,42 @@ class Main:
                output = "%s -\n\tFrequency: %s\n\tCoordinates: %s\n\tAddress: %s\n\tPlaces: %s"
                print(output % (ip, len(data[ip]["timestamp"]), coordinates, address, places))
 
-
       # Send to database
-      self._sent_to_historical_data(data=data)
+      self._sent_to_historical_data(data=data, total_access=total_access, unique_access=len(data.keys()), source='AWS')
+
+   def github_main(self): 
+      tmp, unique,count=retrive_github_info(auth=self.auth, org=self.org, repo=self.repo) 
+
+      data={'referral':{'count':tmp['referral'][0]['count'], 'unique':tmp['referral'][0]['uniques'], 'refferer':tmp['referral'][0]['referrer']},
+            'clones':{'count':tmp['clones']['count'], 'unique':tmp['clones']['uniques']}, 'traffic':{'count':tmp['traffic']['count'], 'unique':tmp['traffic']['uniques']}}
+
+      self._sent_to_historical_data(data=data, total_access=data['clones']['count'], unique_access=data['clones']['unique'], source='GitHub') 
+
+      if self.stdout is True: 
+         stmt="\nClones - \n\tTotal: %s | Unique: %s\nTraffic -\n\ttTotal: %s | Unique: %s\nReferreral - \n\tTotal: %s | Unique: %s | Origin: %s" 
+         stmt = stmt % (data['clones']['count'], data['clones']['unique'], 
+                       data['traffic']['count'], data['traffic']['unique'], 
+                       data['referral']['count'], data['referral']['unique'], tmp['referral'][0]['referrer'])
+         print(stmt) 
+   def main(self): 
+      self.aws_main() 
+      self.github_main() 
 
 class InfoFromFile: 
-   def __init__(self, file_name:str="$HOME/tmp/s3_file.txt"): 
+   def __init__(self, file:str="$HOME/tmp/s3_file.txt"): 
       """
-      The following class takes a file, and retrives the IP and access timestamps
+      The following class takes a file, and retrieves the IP and access timestamps
       from it. 
       :args: 
          file:str - file containing lines of relevent data
          self.data:dict - Object containing IP (key) and timestamps (value list)
       """    
-      self.f = file_name 
+      self.f = file 
       self.data = {}
 
    def itterate_file(self)->dict: 
       """
-       Main method of the class which results in a generated dictionary of IPs (key) and timestamps list (values) 
+      Itterate through a file containing relevent information
       :return:
          return dict containing IPs and their corresponding timestamps
       """
@@ -228,8 +259,9 @@ class InfoFromFile:
 class LocationInfo: 
    def __init__(self, ip:str='127.0.0.1', api_key:str='aaabbbcccdddeee1112_123fg', query:str='lunch', radius:int=0): 
       """
-      The following class takes an IP and generates information regarding location (coordinates and address), as well as 
-      a list of potential sources; based on a user defined query. 
+      The following class, takes an IP address, and then using Google's API generates a rough calculation of which
+      places accessed the site. This is done using a query (specify the type of location), and radius (how far from the
+      source should the system check). Note that the radius is in Meters. 
       :args: 
          ip:str - the IP address that accessed the site
          gmaps:str - Google's API key to use Google Maps API (https://developers.google.com/maps/documentation/javascript/get-api-key)
@@ -240,36 +272,36 @@ class LocationInfo:
       self.gmaps = googlemaps.Client(key=api_key)
       self.query = query 
       self.radius = radius
-      # default values for latitude and longitude 
-      self.lat = 0.0
-      self.long = 0.0
 
-
-   def get_lat_long(self)->str: 
+   def _get_lat_long(self) -> (float, float): 
       """
-      Using FreeGeoIP web service, generate cooredinates (lat, and long) based on an IP address.        
-      :source:
-         https://github.com/pieqq/PyGeoIpMap/blob/master/pygeoipmap.py
+      This function connects to the FreeGeoIP web service to get info from IP addresses.
+      Returns two latitude and longitude.
+      Code from: https://github.com/pieqq/PyGeoIpMap/blob/master/pygeoipmap.py
+      :args:
+         long:float - correspnds to the longitutude
+         lat:float - corresponds to the latitude 
       :return:
-         (latitude, longitude)
+         Return the address and lat/long of each IP accesseing dianomic
+         if there is an error then code returns lat/long
       """
+      lat = 0.0
+      long = 0.0
       r = requests.get("https://freegeoip.net/json/" + self.ip)
       json_response = r.json()
       if json_response['latitude'] and json_response['longitude']:
-         self.at = json_response['latitude']
-         self.long = json_response['longitude']
-      return "(%s, %s)" % (str(self.lat), str(self.long))
+         lat = json_response['latitude']
+         long = json_response['longitude']
+      return lat, long
 
-   def _get_address(self) -> str: 
+   def _get_address(self, lat:float=0.0, long:float=0.0) -> str: 
       """
-      Based on the latitude and longitude generate location address
-         lat:float - latitude 
-         lon:float - longitude 
+      Based on the latitude and longitutde, generate address
       :return:
-         return location address
+         return address:str
       """
       try: 
-         address = self.gmaps.reverse_geocode((self.lat, self.long))
+         address = self.gmaps.reverse_geocode((lat, long))
       except googlemaps.exceptions._RetriableRequest: 
          return "Failed to get Address due to API Key limit. For more info: https://developers.google.com/maps/documentation/javascript/get-api-key" 
       except googlemaps.exceptions.Timeout: 
@@ -280,16 +312,17 @@ class LocationInfo:
          except:
             return ''
 
-   def _get_possible_places(self) -> str:
+   def _get_possible_places(self, lat:float=0.0, long:float=0.0, query:str="lunch") -> str:
       """
       Generate a list of places based on the lcation, query, and radius (in meters)
       :args: 
+         query:str - what the user is searching for
       :return:
          "list" of potential places based on query 
       """
       result = ""
       try: 
-         places = self.gmaps.places(query=self.query, location=(self.lat, self.long), radius=self.radius)
+         places = self.gmaps.places(query=self.query, location=(lat, long), radius=self.radius)
       except googlemaps.exceptions as e: 
          return "Failed to get potential %s places due to API Key limit. For more info: https://developers.google.com/maps/documentation/javascript/get-api-key" % query
       except ooglemaps.exceptions.Timeout:
@@ -298,6 +331,23 @@ class LocationInfo:
          for dict in places['results']:
             result += dict['name'].replace("'","").replace('"',"") + ", "
          return result
+
+def retrive_github_info(auth=('user@github.com', 'password'), org='user', repo='NewRepo') -> (dict, int, int):
+   """
+   Derive relevent information from github insight
+   :args: 
+      auth:str - authentication information (username/password) 
+      org:str - organization repo is under. If not stated then script automatically assumes that username is org name 
+      repo:str - repository name 
+   :return: 
+      1. Return dict with traffic, clone, and referrel info 
+      2. Return number of distinct clones 
+      3. Return total number of clones  
+   """
+   gh =  GitHub(auth=auth, org=org, repo=repo)  
+   data = {"traffic": gh.get_traffic(), "clones": gh.get_clones(), "referral": gh.get_referral()}  
+   return data, data['clones']['uniques'], data['clones']['count'] 
+            
 
 
 if __name__ == "__main__": 

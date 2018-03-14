@@ -47,6 +47,7 @@ class Main:
            +"\n\t--host: IP address of the PostgresSQL [--host=127.0.0.1]"
            +"\n\t--usr: User and password to connect to postgres [--usr=root:'']"
            +"\n\t--db-name: Name of database being used [--db-name=test]"  
+           +"\n\t--git-usr: Usernamne and password to access git [--git-usr='user@github.com':'password']"
            ) 
       exit(1)
 
@@ -65,6 +66,7 @@ class Main:
          pass:string - password of PostgresSQL user 
          dbname:str - database name  
          stdout:boolean - Print output to screen 
+auth=('user@github.com', 'password'), org='user', repo='NewRepo'
       """
       self.file = "$HOME/tmp/site_logs.txt"
       self.api_key = "aaaBcD123kd-d83c-C83s" # The API Key is invalid, user must include a valid IP for code to work
@@ -76,6 +78,11 @@ class Main:
       self.passwd = '' 
       self.dbname = 'test' 
       self.stdout = False
+      
+      # GitHub requirments 
+      self.auth=('user@github.com', 'password')
+      self.org=None 
+      self.repo='NewRepo' 
 
       for value in values: 
          if value is sys.argv[0]: 
@@ -99,8 +106,15 @@ class Main:
             self.dbname = str(value.split("=")[-1]) 
          elif "--stdout" in value: 
             self.stdout = True 
+         elif "--git-usr" in value: 
+            self.auth = (str(value.split("=")[-1].split(":")[0]), str(value.split("=")[-1].split(":")[-1])) 
+         elif "--git-org" in value: 
+            self.org = str(value.split("=")[-1]) 
+         elif "--git-repo" in value: 
+            self.repo = str(value.split("=")[-1])
          else: 
             self._help(invalid=value)
+
       self.file = self.file.replace("$HOME", os.getenv("HOME")).replace("$PWD", os.getenv("PWD")).replace("~", os.path.expanduser('~'))
        
    def _sent_to_historical_data(self, data={}, total_access=0, unique_access=0, source=''): 
@@ -153,8 +167,10 @@ class Main:
  
          data[ip] = {"frequency": len(tmp[ip]["timestamp"]), "timestamp":self.convert_timestamp(tmp[ip]["timestamp"]), "coordinates":coordinates, 
                      "address":address, "places": places} 
+
          # Print to screen 
          if self.stdout is True: 
+            print("AWS Download Info") 
             if self.timestamp is True: 
                output = "%s -\n\tFrequency: %s\n\tTimestamp: %s\n\tCoordinates: %s\n\tAddress: %s\n\tPlaces: %s"
                print(output % (ip, len(data[ip]["timestamp"]), data[ip]["timestamp"], coordinates, address, places))
@@ -165,9 +181,24 @@ class Main:
       # Send to database
       self._sent_to_historical_data(data=data, total_access=total_access, unique_access=len(data.keys()), source='AWS')
 
-   def github_main(): 
-      data, unique,count=retrive_github_info(auth=('user@github.com', 'password'), org='user', repo='NewRepo') 
-     
+   def github_main(self): 
+      tmp, unique,count=retrive_github_info(auth=self.auth, org=self.org, repo=self.repo) 
+
+      data={'referral':{'count':tmp['referral'][0]['count'], 'unique':tmp['referral'][0]['uniques'], 'refferer':tmp['referral'][0]['referrer']},
+            'clones':{'count':tmp['clones']['count'], 'unique':tmp['clones']['uniques']}, 'traffic':{'count':tmp['traffic']['count'], 'unique':tmp['traffic']['uniques']}}
+
+      self._sent_to_historical_data(data=data, total_access=data['clones']['count'], unique_access=data['clones']['unique'], source='GitHub') 
+
+      if self.stdout is True: 
+         stmt="\nClones - \n\tTotal: %s | Unique: %s\nTraffic -\n\ttTotal: %s | Unique: %s\nReferreral - \n\tTotal: %s | Unique: %s | Origin: %s" 
+         stmt = stmt % (data['clones']['count'], data['clones']['unique'], 
+                       data['traffic']['count'], data['traffic']['unique'], 
+                       data['referral']['count'], data['referral']['unique'], tmp['referral'][0]['referrer'])
+         print(stmt) 
+   def main(self): 
+      self.aws_main() 
+      self.github_main() 
+
 class InfoFromFile: 
    def __init__(self, file:str="$HOME/tmp/s3_file.txt"): 
       """
@@ -314,11 +345,11 @@ def retrive_github_info(auth=('user@github.com', 'password'), org='user', repo='
       3. Return total number of clones  
    """
    gh =  GitHub(auth=auth, org=org, repo=repo)  
-   data = {"traffic": gh.get_traffic(), "clones": gh.get_clones(), "referreral": gh.get_referreral()}  
+   data = {"traffic": gh.get_traffic(), "clones": gh.get_clones(), "referral": gh.get_referral()}  
    return data, data['clones']['uniques'], data['clones']['count'] 
             
 
 
 if __name__ == "__main__": 
    m = Main() 
-   m.aws_main()
+   m.main()

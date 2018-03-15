@@ -12,6 +12,7 @@ The following project is intended to help with understanding web traffic. In thi
 * extras/retrieve_from_github.py - Using GitHub insight retrieve clone and traffic information regarding a repository. 
 
 **Prerequisites**:
+
 * [Google API Key](https://developers.google.com/maps/documentation/javascript/get-api-key)
 * [Postgres](https://www.postgresql.org/download/)
 * [Python3](https://www.python.org)
@@ -24,6 +25,7 @@ The following project is intended to help with understanding web traffic. In thi
 Alternatively one can run ```sudo bash $HOME/AccessLogs_Info_Retrieval/extras/install.sh```
 
 **Process & Example** 
+
 In order for repository to work the user must execute the following  
 Install prerequisites & Configure AWS
 Create database table 

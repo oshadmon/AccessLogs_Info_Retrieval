@@ -167,7 +167,6 @@ class Main:
 
          # Print to screen 
          if self.stdout is True: 
-            print("AWS Download Info") 
             if self.timestamp is True: 
                output = "%s -\n\tFrequency: %s\n\tTimestamp: %s\n\tCoordinates: %s\n\tAddress: %s\n\tPlaces: %s"
                print(output % (ip, len(data[ip]["timestamp"]), data[ip]["timestamp"], coordinates, address, places))
@@ -191,7 +190,7 @@ class Main:
       self._sent_to_historical_data(data=data, total_access=data['clones']['count'], unique_access=data['clones']['unique'], source='GitHub') 
 
       if self.stdout is True: 
-         stmt="\nClones - \n\tTotal: %s | Unique: %s\nTraffic -\n\ttTotal: %s | Unique: %s\nReferreral - \n\tTotal: %s | Unique: %s | Origin: %s" 
+         stmt="\nClones - \n\tTotal: %s | Unique: %s\nTraffic -\n\tTotal: %s | Unique: %s\nReferreral - \n\tTotal: %s | Unique: %s | Origin: %s" 
          stmt = stmt % (data['clones']['count'], data['clones']['unique'], 
                        data['traffic']['count'], data['traffic']['unique'], 
                        data['referral']['count'], data['referral']['unique'], tmp['referral'][0]['referrer'])
@@ -337,7 +336,8 @@ class LocationInfo:
             result += dict['name'].replace("'","").replace('"',"") + ", "
          return result
 
-def retrieve_github_info(auth=('user@github.com', 'password'), org='user', repo='NewRepo') -> (dict, int, int):
+
+def retrieve_github_info(auth=('user@github.com', 'password'), org=None, repo='NewRepo') -> (dict, int, int):
    """
    Derive relevent information from github insight
    :args: 
@@ -349,10 +349,10 @@ def retrieve_github_info(auth=('user@github.com', 'password'), org='user', repo=
       2. Return number of distinct clones 
       3. Return total number of clones  
    """
-   gh =  GitHub(auth=auth, org=org, repo=repo)  
-   data = {"traffic": gh.get_traffic(), "clones": gh.get_clones(), "referral": gh.get_referral()}  
-   return data, data['clones']['uniques'], data['clones']['count'] 
-            
+   gh =  GitHub(auth=auth, org=org, repo=repo)
+   data = {"traffic": gh.get_traffic(), "clones": gh.get_clones(), "referral": gh.get_referral()}
+   print(data['clones'])
+   return data, data['clones']['uniques'], data['clones']['count']
 
 
 if __name__ == "__main__": 

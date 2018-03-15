@@ -1,8 +1,10 @@
 **Description**:
+
 The following project is intended to help with understanding web traffic. In this instance the script takes IP address and timestamps, and then returns geolocation, and potential places based on user defined queries. This tool is intended to assist understanding of who accessed a given site.
 
 
 **Files**:
+
 * generate_ip_info.py - The generate_ip_info script takes a file containing IP and timestamps, and iterates through them to find geolocation, and potential near by places (defined by query). It then takes the relevant information, and sends it into a database table such that it is easily retrieved, and accessible.
 * install.sh - installation script for all prerequisites. The script doesn't not configure AWS 
 * extras/create_table.sql - SQL table and initial line required for generate_ip_info.py
@@ -49,14 +51,13 @@ Option List:
         --git-repo: Repository name [--git-repo=NewRepo]
 
 # Execute 
-ubuntu:~/AccessLogs_Info_Retrieval$ bash 
-
-ubuntu:~/AccessLogs_Info_Retrieval/extras/retrieve_from_aws_s3.sh s3://bucket-name
+ubuntu:~/AccessLogs_Info_Retrieval$ bash extras/retrieve_from_aws_s3.sh s3://bucket-name 
 download: s3://bucket-name/test_2018-01-26-15-26-14-EA6B7463F0FAFB30 to ../data/foglamp_2018-01-26-15-26-14-EA6B7463F0FAFB30.txt
+
 ubuntu:~/AccessLogs_Info_Retrieval$ cat ~/data/output.txt 
 94b0d7bdce49506054db00c7ed077b7600249ec3841c7afff89cdc3f06544e61 test [26/Jan/2018:14:58:44 +0000] 88.97.58.233 
 
-ubuntu:~/AccessLogs_Info_Retrieval$ time python3 ~/AccessLogs_Info_Retrieval/generate_ip_info.py --file=/home/usr/data/output.txt --api-key=aaaBcD123kd-d83c-C83sI --usr=usr:passwd --git-repo=AccessLogs_Info_Retrieval --git-usr=usr@github.com:passwd --stdout 
+ubuntu:~/AccessLogs_Info_Retrieval$ time python3 generate_ip_info.py --file=/home/usr/data/output.txt --api-key=aaaBcD123kd-d83c-C83sI --usr=usr:passwd --git-repo=AccessLogs_Info_Retrieval --git-usr=usr@github.com:passwd --stdout 
 88.97.58.233 -
 	Frequency: 12
 	Coordinates: (51.5142, -0.0931)
@@ -70,6 +71,7 @@ Traffic -
 	Total: 142 | Unique: 2
 Referreral - 
 	Total: 22 | Unique: 1 | Origin: github.com
+
 ```
 
 

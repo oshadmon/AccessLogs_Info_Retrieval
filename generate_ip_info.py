@@ -12,7 +12,6 @@ import re
 import requests
 import sys 
 
-from extras.retrieve_from_github import GitHub
 from json import dumps 
 from pygeocoder import Geocoder
 
@@ -109,7 +108,7 @@ class Main:
          address:str - address of ip 
          places:str - potential list of places 
       """
-      stmt = "INSERT INTO historical_data(total_access, unique_access, ip_info, from_where) VALUES (%s, %s, '%s', '%s')" 
+      stmt = "INSERT INTO historical_data(total_access, unique_access, ip_data, from_where) VALUES (%s, %s, '%s', '%s')" 
       stmt = stmt % (total_access, unique_access, dumps(data), source) 
       conn = psycopg2.connect(host=self.host, user=self.usr, password=self.passwd, dbname=self.dbname)
       conn.autocommit = True 
@@ -119,14 +118,14 @@ class Main:
 
    def _send_to_ip_data(self, data={}, source='AWS'): 
       """
-      Insert into ip_data `ip_info` in details rather than a JSON object 
+      Insert into ip_data `ip_data` in details rather than a JSON object 
       :args: 
          data:dict - JSON with data object 
          souce:str - where is the original data from 
       """
-      check_row="SELECT COUNT(*) FROM ip_info WHERE ip='%s' AND source='%s';" 
-      insert_stmt="INSERT INTO ip_info(ip, source, total_access, access_times, coordiantes, address, places) VALUES ('%s', '%s', %s, '%s', '%s', '%s', '%s');"
-      update_stmt="UPDATE ip_info SET update_timestamp=NOW(), total_access=%s WHERE ip='%s' AND source='%s';" 
+      check_row="SELECT COUNT(*) FROM ip_data WHERE ip='%s' AND source='%s';" 
+      insert_stmt="INSERT INTO ip_data(ip, source, total_access, access_times, coordiantes, address, places) VALUES ('%s', '%s', %s, '%s', '%s', '%s', '%s');"
+      update_stmt="UPDATE ip_data SET update_timestamp=NOW(), total_access=%s WHERE ip='%s' AND source='%s';" 
 
       conn = psycopg2.connect(host=self.host, user=self.usr, password=self.passwd, dbname=self.dbname)
       conn.autocommit = True
@@ -170,8 +169,7 @@ class Main:
  
          data[ip] = {"frequency": len(tmp[ip]["timestamp"]), "timestamp":self.convert_timestamp(tmp[ip]["timestamp"]), "coordinates":coordinates, 
                      "address":address, "places": places} 
-         self._send_to_ip_info(data=data, source='AWS') 
-         exit(1)
+         self._send_to_ip_data(data=data, source='AWS') 
  
          # Print to screen 
          if self.stdout is True: 

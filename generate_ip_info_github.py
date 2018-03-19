@@ -97,7 +97,7 @@ class Main:
          address:str - address of ip 
          places:str - potential list of places 
       """
-      stmt = "INSERT INTO historical_data(total_access, unique_access, ip_info, from_where) VALUES (%s, %s, '%s', '%s')" 
+      stmt = "INSERT INTO historical_data(total_access, unique_access, ip_data, from_where) VALUES (%s, %s, '%s', '%s')" 
       stmt = stmt % (total_access, unique_access, dumps(data), source) 
       conn = psycopg2.connect(host=self.host, user=self.usr, password=self.passwd, dbname=self.dbname)
       conn.autocommit = True 

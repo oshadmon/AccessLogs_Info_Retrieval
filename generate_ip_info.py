@@ -17,16 +17,22 @@ from pygeocoder import Geocoder
 
 class Main: 
    def __init__(self, *args): 
-      """The following class controls the processes by which everything runs
+      """
+      The following class controls the processes by which everything runs
       :args: 
          args  (sys.argv):list - Valules declared when calling test (shown in _help method)
       """
       if "--help" in sys.argv: 
          self._help()
       self._declare_values(values=sys.argv)
+      # create connection to db (closed in main when everything is done) 
+      conn = psycopg2.connect(host=self.host, user=self.usr, password=self.passwd, dbname=self.dbname)
+      conn.autocommit = True
+      self.c = conn.cursor()
 
    def _help(self, invalid:str=""):
-      """Print options to screen and exit
+      """
+      Print options to screen and exit
       :args: 
          invalid:str - If the user wants an option that isn't supported, then a corresponding error is printed 
       """ 
@@ -46,7 +52,8 @@ class Main:
       exit(1)
 
    def _declare_values(self, values:list=[]): 
-      """Declare values that are used through the program
+      """
+      Declare values that are used through the program
       :args:
          file:str - File logs file containing relevent information
          api_key:str - Google's API key to use Google Maps API (https://developers.google.com/maps/documentation/javascript/get-api-key)
@@ -99,50 +106,41 @@ class Main:
       self.file = self.file.replace("$HOME", os.getenv("HOME")).replace("$PWD", os.getenv("PWD")).replace("~", os.path.expanduser('~'))
        
    def _sent_to_historical_data(self, data={}, total_access=0, unique_access=0, source=''): 
-      """Implementation sending data to Postgres database rather print 
+      """
+      Implementation sending data to Postgres database rather print 
+      historical_data table is a summary of all the different points where data is coming from 
       :args: 
-         ip:str - IP address 
-         frequency:int - how instances of the IP there are 
-         timestamp:list - A list (as string) of timestamp 
-         coordinates:list - coordiantes from which IP was accessed 
-         address:str - address of ip 
-         places:str - potential list of places 
+         data:dict - Relevent data as JSON object 
+         total_access:int - Total number access 
+         unique_access:int - Number of unique access 
       """
       stmt = "INSERT INTO historical_data(total_access, unique_access, ip_data, from_where) VALUES (%s, %s, '%s', '%s')" 
       stmt = stmt % (total_access, unique_access, dumps(data), source) 
-      conn = psycopg2.connect(host=self.host, user=self.usr, password=self.passwd, dbname=self.dbname)
-      conn.autocommit = True 
-      c = conn.cursor() 
-      c.execute(stmt)
-      c.close() 
+      self.c.execute(stmt)
 
    def _send_to_ip_data(self, data={}, source='AWS'): 
       """
       Insert into ip_data `ip_data` in details rather than a JSON object 
       :args: 
          data:dict - JSON with data object 
-         souce:str - where is the original data from 
+         source:str - where is the original data from 
       """
       check_row="SELECT COUNT(*) FROM ip_data WHERE ip='%s' AND source='%s';" 
       insert_stmt="INSERT INTO ip_data(ip, source, total_access, access_times, coordiantes, address, places) VALUES ('%s', '%s', %s, '%s', '%s', '%s', '%s');"
       update_stmt="UPDATE ip_data SET update_timestamp=NOW(), total_access=%s WHERE ip='%s' AND source='%s';" 
 
-      conn = psycopg2.connect(host=self.host, user=self.usr, password=self.passwd, dbname=self.dbname)
-      conn.autocommit = True
-      c = conn.cursor()
-
       for ip in data.keys(): 
-         c.execute(check_row % (ip, source))
+         self.c.execute(check_row % (ip, source))
          if c.fetchall()[0][0] == 0: 
             stmt = insert_stmt % (ip, source, data[ip]['frequency'], data[ip]['timestamp'], data[ip]['coordinates'], data[ip]['address'], data[ip]['places']) 
-            c.execute(stmt)
+            self.c.execute(stmt)
          else: 
             stmt = update_stmt % (data[ip]['frequency'], ip, source) 
-            c.execute(stmt)
-      c.close()
+            self.c.execute(stmt)
  
    def convert_timestamp(self, timestamps=[]) -> str: 
-      """Convert a list of timestamps to a string of timestamps
+      """
+      Convert a list of timestamps to a string of timestamps
       :args:
          timestamps:list - a list of timestamps
       :return: 
@@ -154,11 +152,14 @@ class Main:
       return output
    
    def aws_main(self): 
-      """Retrieve information regarding AWS, send it to database; if valid, print the results"""
+      """
+      Retrieve information regarding AWS, send it to database; if valid, print the results
+      """
       iff = InfoFromFile(file=self.file) 
       tmp = iff.itterate_file() # Get Information from File
       data = {} 
       total_access=0 
+
       for ip in tmp: # Get other information
          li = LocationInfo(ip=ip, api_key=self.api_key, query=self.query, radius=self.radius)
          lat, long = li._get_lat_long() 
@@ -166,10 +167,11 @@ class Main:
          address = li._get_address(lat, long)
          places = li._get_possible_places(lat, long, self.query)
          total_access += len(tmp[ip]["timestamp"])
- 
+         
+         # Store infomration in data 
          data[ip] = {"frequency": len(tmp[ip]["timestamp"]), "timestamp":self.convert_timestamp(tmp[ip]["timestamp"]), "coordinates":coordinates, 
                      "address":address, "places": places} 
-         self._send_to_ip_data(data=data, source='AWS') 
+
  
          # Print to screen 
          if self.stdout is True: 
@@ -182,6 +184,8 @@ class Main:
 
       # Send to database
       self._sent_to_historical_data(data=data, total_access=total_access, unique_access=len(data.keys()), source='AWS')
+      self._send_to_ip_data(data=data, source='AWS')
+      self.c.close() 
 
 class InfoFromFile: 
    def __init__(self, file:str="$HOME/tmp/s3_file.txt"): 

@@ -175,6 +175,7 @@ class GitHub:
    def __init__(self, auth=('user@githbu.com', 'pass'), org=None, repo='NewRepo'):
       """
       Using GitHub connection parameters communicate retrieve insight 
+      Based on: https://github.com/nchah/github-traffic-stats/blob/master/gts/main.py
       :args: 
          self.auth:str -  github authentication information (user, password)
          self.org:str - organization under which repository exists, if no such org then uses username 

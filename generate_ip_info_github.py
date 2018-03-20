@@ -16,16 +16,23 @@ from pygeocoder import Geocoder
 
 class Main: 
    def __init__(self, *args): 
-      """The following class controls the processes by which everything runs
+      """
+      The following class controls the processes by which everything runs
       :args: 
          args  (sys.argv):list - Valules declared when calling test (shown in _help method)
       """
       if "--help" in sys.argv: 
          self._help()
       self._declare_values(values=sys.argv)
+      # create connection to db (closed in main when everything is done) 
+      conn = psycopg2.connect(host=self.host, user=self.usr, password=self.passwd, dbname=self.dbname)
+      conn.autocommit = True
+      self.c = conn.cursor()
+
 
    def _help(self, invalid:str=""):
-      """Print options to screen and exit
+      """
+      Print options to screen and exit
       :args: 
          invalid:str - If the user wants an option that isn't supported, then a corresponding error is printed 
       """ 
@@ -37,13 +44,14 @@ class Main:
            +"\n\t--db-name: Name of database being used [--db-name=test]"  
            +"\n\t--git-usr: Usernamne and password to access git [--git-usr='user@github.com':'password']"
            +"\n\t--git-org: Organization under which repository exists [--git-org='user']"
-           +"\n\t--git-repo: Repository name [--git-repo=NewRepo]"
+           +"\n\t--git-repo: Repository name [--git-repo=NewRepo,NewRepo2]"
            +"\n\t--stdout: print to screen otherwise will just store to database (default false)"
            ) 
       exit(1)
 
    def _declare_values(self, values:list=[]): 
-      """Declare values that are used through the program
+      """
+      Declare values that are used through the program
       :args:
          host:str - IP address of the PostgresSQL
          user:str - User of the PostgresSQL  
@@ -52,7 +60,7 @@ class Main:
          stdout:boolean - Print output to screen 
          auth:str - github authentication ('user@github.com', 'password') 
          org:str -  organization name 
-         repo:str - Repository name 
+         repo:list - List of repository names 
       """
       self.host = '127.0.0.1' 
       self.usr = 'root' 
@@ -88,75 +96,80 @@ class Main:
             self._help(invalid=value)
        
    def _sent_to_historical_data(self, data={}, total_access=0, unique_access=0, source=''): 
-      """Implementation sending data to Postgres database rather print 
+      """
+      Implementation sending data to Postgres database rather print 
+      historical_data table is a summary of all the different points where data is coming from 
       :args: 
-         ip:str - IP address 
-         frequency:int - how instances of the IP there are 
-         timestamp:list - A list (as string) of timestamp 
-         coordinates:list - coordiantes from which IP was accessed 
-         address:str - address of ip 
-         places:str - potential list of places 
+         data:dict - Relevent data as JSON object 
+         total_access:int - Total number access 
+         unique_access:int - Number of unique access 
       """
       stmt = "INSERT INTO historical_data(total_access, unique_access, ip_data, from_where) VALUES (%s, %s, '%s', '%s')" 
       stmt = stmt % (total_access, unique_access, dumps(data), source) 
-      conn = psycopg2.connect(host=self.host, user=self.usr, password=self.passwd, dbname=self.dbname)
-      conn.autocommit = True 
-      c = conn.cursor() 
-      c.execute(stmt)
-      c.close() 
+      self.c.execute(stmt)
 
    def _send_to_github_data(self, repo='', data={}): 
+      """
+      Insert data regarding github into github_data table
+      github_data table is a summmary of the information regarding github
+      :args: 
+         repo:str - Repository name 
+         data:dict - Dictionary of data regarding github 
+      """ 
       inst_stmt = "INSERT INTO github_data(repo, info, total, uniques) VALUES ('%s', '%s', %s, %s);" 
-      conn = psycopg2.connect(host=self.host, user=self.usr, password=self.passwd, dbname=self.dbname)
-      conn.autocommit = True
-      c = conn.cursor()
       for key in data.keys(): 
          stmt= inst_stmt % (repo, key, data[key]['count'], data[key]['unique']) 
-         c.execute(stmt)
-      c.close() 
+         self.c.execute(stmt)
 
    def _send_to_github_referral_list(self, data={}): 
+      """
+      Insert data regarding referrals 
+      github_referral table is a summary of where access points are coming from 
+      :args: 
+         data:dict - Object with information regarding referrals 
+      """
       check_count="SELECT COUNT(*) FROM github_referral_list WHERE referrer='%s';" 
       insert_stmt="INSERT INTO github_referral_list(referrer, unique_referrals, count_referrals) VALUES ('%s', %s, %s)" 
-      update_stmt="UPDATE github_referral_list SET unique_referrals=%s, count_referrals=%s WHERE referrer='%s'" 
-
-      conn = psycopg2.connect(host=self.host, user=self.usr, password=self.passwd, dbname=self.dbname)
-      conn.autocommit = True
-      c = conn.cursor()
+      update_stmt="UPDATE github_referral_list SET unique_referrals=%s, count_referrals=%s, update_timestamp=NOW()  WHERE referrer='%s'" 
  
       for value in data: 
-         c.execute(check_count % value['referrer'])
+         self.c.execute(check_count % value['referrer'])
          if c.fetchall()[0][0] == 0:
             stmt = insert_stmt % (value['referrer'], value['uniques'], value['count'])
-            c.execute(stmt)
+            self.c.execute(stmt)
          else: 
             stmt = update_stmt % (value['uniques'], value['count'], value['referrer']) 
-            c.execute(stmt)
-      c.close() 
+            self.c.execute(stmt)
 
    def github_main(self): 
       """
       Retrieve information regarding GitHub, and send it to database
       If valid, print relevent information
       """
-      for repo in self.repo: 
+      for repo in self.repo: # Iterate through repos  
          gh=GitHub(auth=self.auth, org=self.org, repo=repo) 
-         tmp={"traffic": gh.get_traffic(), "clones": gh.get_clones(), "referral": gh.get_referral()}
-         self._send_to_github_referral_list(data=tmp['referral'])
 
+         # Generate info regarding github and store as a large dict 
+         tmp={"traffic": gh.get_traffic(), "clones": gh.get_clones(), "referral": gh.get_referral()}
+         
+         # Relevent data Object  
          data={'referral':{'count':tmp['referral'][0]['count'], 'unique':tmp['referral'][0]['uniques'], 'refferer':tmp['referral'][0]['referrer']},
                'clones':{'count':tmp['clones']['count'], 'unique':tmp['clones']['uniques']}, 'traffic':{'count':tmp['traffic']['count'], 'unique':tmp['traffic']['uniques']}}
 
+         # store to database tables 
          self._sent_to_historical_data(data=data, total_access=data['clones']['count'], unique_access=data['clones']['unique'], source='GitHub') 
          self._send_to_github_data(repo=repo, data=data) 
          self._send_to_github_referral_list(data=tmp['referral']) 
-
+         
+         # print if valid 
          if self.stdout is True: 
             stmt="\nClones - \n\tTotal: %s | Unique: %s\nTraffic -\n\tTotal: %s | Unique: %s\nReferreral - \n\tTotal: %s | Unique: %s | Origin: %s" 
             stmt = stmt % (data['clones']['count'], data['clones']['unique'], 
                        data['traffic']['count'], data['traffic']['unique'], 
                        data['referral']['count'], data['referral']['unique'], tmp['referral'][0]['referrer'])
             print(stmt) 
+
+      self.c.close() 
 
 class GitHub:
    def __init__(self, auth=('user@githbu.com', 'pass'), org=None, repo='NewRepo'):

@@ -6,10 +6,10 @@ The following project is intended to help with understanding web traffic. In thi
 **Files**:
 
 * generate_ip_info.py - The generate_ip_info script takes a file containing IP and timestamps, and iterates through them to find geolocation, and potential near by places (defined by query). It then takes the relevant information, and sends it into a database table such that it is easily retrieved, and accessible.
+* generate_ip_info_github.py - Generate information regarding GitHub 
 * install.sh - installation script for all prerequisites. The script doesn't not configure AWS 
 * extras/create_table.sql - SQL table and initial line required for generate_ip_info.py
 * extras/retrive_from_aws_s3.sh - Using AWS bucket URL retrieve all information from bucket (files). The files are merged into one (1) file to be used by generate_ip_info.py.
-* extras/retrieve_from_github.py - Using GitHub insight retrieve clone and traffic information regarding a repository. 
 
 **Prerequisites**:
 
@@ -38,19 +38,26 @@ ubuntu:~/AccessLogs_Info_Retrieval$ bash extras/retrieve_from_aws_s3.sh
 Missing S3 Bucket URL [ex. bash extras/retrieve_from_aws_s3.sh s3://website-analytics]
 
 ubuntu:~/AccessLogs_Info_Retrieval$ python3 generate_ip_info.py  --help
-Option List:
-        --file: log file containing relevant information [--file=$HOME/tmp/site_logs.txt]
-        --api-key: Google's API key to use Google Maps API [--api-key=aaaBcD123kd-d83c-C83s]
-        --query: The type of location to check [--query=lunch]
-        --radius: In meters how far from source to check [--radius=0]
-        --timestamp:  Print a list the accessed timestamps per IP. If set to False (default), then print only the number of times that IP accessed the website
-        --stdout: print to screen otherwise will just store to database (default false)
-        --host: IP address of the PostgresQL [--host=127.0.0.1]
-        --usr: User and password to connect to postgres [--usr=root:'']
-        --db-name: Name of database being used [--db-name=test]
-        --git-usr: Username and password to access git [--git-usr='user@github.com':'password']
-        --git-org: Organization under which repository exists [--git-org='user']
-        --git-repo: Repository name [--git-repo=NewRepo]
+Option List: 
+	--file: log file containing relevent information [--file=$HOME/tmp/site_logs.txt]
+	--api-key: Google's API key to use Google Maps API [--api-key=aaaBcD123kd-d83c-C83s]
+	--query: The type of location to check [--query=lunch]
+	--radius: In meters how far from source to check [--radius=0]
+	--timestamp:  Print a list the accessed timestamps per IP. If set to False (default), then print only the number of times that IP accessed the website
+	--stdout: print to screen otherwise will just store to database (default false)
+	--host: IP address of the PostgresSQL [--host=127.0.0.1]
+	--usr: User and password to connect to postgres [--usr=root:'']
+	--db-name: Name of database being used [--db-name=test]
+
+ubuntu:~/AccessLogs_Info_Retrieval$ python3 generate_ip_info_github.py  --help
+Option List: 
+	--host: IP address of the PostgresSQL [--host=127.0.0.1]
+	--usr: User and password to connect to postgres [--usr=root:'']
+	--db-name: Name of database being used [--db-name=test]
+	--git-usr: Usernamne and password to access git [--git-usr='user@github.com':'password']
+	--git-org: Organization under which repository exists [--git-org='user']
+	--git-repo: Repository name [--git-repo=NewRepo,NewRepo2]
+	--stdout: print to screen otherwise will just store to database (default false)
 
 # Execute 
 ubuntu:~/AccessLogs_Info_Retrieval$ bash extras/retrieve_from_aws_s3.sh s3://bucket-name 
@@ -65,8 +72,8 @@ ubuntu:~/AccessLogs_Info_Retrieval$ time python3 generate_ip_info.py --file=/hom
 	Coordinates: (51.5142, -0.0931)
 	Address: Queens House, London EC2V, UK
 	Places: Failed to get potential lunch places due to API Key limit. For more info: https://developers.google.com/maps/documentation/javascript/get-api-key
-{'clones': [{'timestamp': '2018-03-02T00:00:00Z', 'uniques': 1, 'count': 1}, {'timestamp': '2018-03-08T00:00:00Z', 'uniques': 1, 'count': 1}], 'uniques': 2, 'count': 2}
 
+ubuntu:~/AccessLogs_Info_Retrieval$ time python3 generate_ip_info.py --usr=usr:passwd --git-repo=AccessLogs_Info_Retrieval --git-usr=usr@github.com:passwd --stdout
 Clones - 
 	Total: 2 | Unique: 2
 Traffic -

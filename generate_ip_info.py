@@ -1,9 +1,7 @@
 """
 By: Ori Shadmon 
 Date: February 2018 
-Description: The following piece of code takes the "Access Log" file and retirves the IP Addresses, and access dates. 
-It then usees the IP Addresses, and uses Google Maps and https://freegeoip.net/ to get location and its corresponding
-information.  
+Description: Using a file of IP addresses and TIMESTAMPs generate information in terms of location and potential places. 
 """ 
 
 import datetime
@@ -14,22 +12,27 @@ import re
 import requests
 import sys 
 
-from extras.retrieve_from_github import GitHub
 from json import dumps 
 from pygeocoder import Geocoder
 
 class Main: 
    def __init__(self, *args): 
-      """The following class controls the processes by which everything runs
+      """
+      The following class controls the processes by which everything runs
       :args: 
          args  (sys.argv):list - Valules declared when calling test (shown in _help method)
       """
       if "--help" in sys.argv: 
          self._help()
       self._declare_values(values=sys.argv)
+      # create connection to db (closed in main when everything is done) 
+      conn = psycopg2.connect(host=self.host, user=self.usr, password=self.passwd, dbname=self.dbname)
+      conn.autocommit = True
+      self.c = conn.cursor()
 
    def _help(self, invalid:str=""):
-      """Print options to screen and exit
+      """
+      Print options to screen and exit
       :args: 
          invalid:str - If the user wants an option that isn't supported, then a corresponding error is printed 
       """ 
@@ -45,14 +48,12 @@ class Main:
            +"\n\t--host: IP address of the PostgresSQL [--host=127.0.0.1]"
            +"\n\t--usr: User and password to connect to postgres [--usr=root:'']"
            +"\n\t--db-name: Name of database being used [--db-name=test]"  
-           +"\n\t--git-usr: Usernamne and password to access git [--git-usr='user@github.com':'password']"
-           +"\n\t--git-org: Organization under which repository exists [--git-org='user']"
-           +"\n\t--git-repo: Repository name [--git-repo=NewRepo]"
            ) 
       exit(1)
 
    def _declare_values(self, values:list=[]): 
-      """Declare values that are used through the program
+      """
+      Declare values that are used through the program
       :args:
          file:str - File logs file containing relevent information
          api_key:str - Google's API key to use Google Maps API (https://developers.google.com/maps/documentation/javascript/get-api-key)
@@ -65,9 +66,6 @@ class Main:
          pass:string - password of PostgresSQL user 
          dbname:str - database name  
          stdout:boolean - Print output to screen 
-         auth:str - github authentication ('user@github.com', 'password') 
-         org:str -  organization name 
-         repo:str - Repository name 
       """
       self.file = "$HOME/tmp/site_logs.txt"
       self.api_key = "aaaBcD123kd-d83c-C83s" # The API Key is invalid, user must include a valid IP for code to work
@@ -79,11 +77,6 @@ class Main:
       self.passwd = '' 
       self.dbname = 'test' 
       self.stdout = False
-      
-      # GitHub requirments 
-      self.auth=('user@github.com', 'password')
-      self.org=None 
-      self.repo='NewRepo' 
 
       for value in values: 
          if value is sys.argv[0]: 
@@ -107,37 +100,47 @@ class Main:
             self.dbname = str(value.split("=")[-1]) 
          elif "--stdout" in value: 
             self.stdout = True 
-         elif "--git-usr" in value: 
-            self.auth = (str(value.split("=")[-1].split(":")[0]), str(value.split("=")[-1].split(":")[-1])) 
-         elif "--git-org" in value: 
-            self.org = str(value.split("=")[-1]) 
-         elif "--git-repo" in value: 
-            self.repo = str(value.split("=")[-1])
          else: 
             self._help(invalid=value)
 
       self.file = self.file.replace("$HOME", os.getenv("HOME")).replace("$PWD", os.getenv("PWD")).replace("~", os.path.expanduser('~'))
        
    def _sent_to_historical_data(self, data={}, total_access=0, unique_access=0, source=''): 
-      """Implementation sending data to Postgres database rather print 
-      :args: 
-         ip:str - IP address 
-         frequency:int - how instances of the IP there are 
-         timestamp:list - A list (as string) of timestamp 
-         coordinates:list - coordiantes from which IP was accessed 
-         address:str - address of ip 
-         places:str - potential list of places 
       """
-      stmt = "INSERT INTO historical_data(total_access, unique_access, ip_info, from_where) VALUES (%s, %s, '%s', '%s')" 
+      Implementation sending data to Postgres database rather print 
+      historical_data table is a summary of all the different points where data is coming from 
+      :args: 
+         data:dict - Relevent data as JSON object 
+         total_access:int - Total number access 
+         unique_access:int - Number of unique access 
+      """
+      stmt = "INSERT INTO historical_data(total_access, unique_access, ip_data, from_where) VALUES (%s, %s, '%s', '%s')" 
       stmt = stmt % (total_access, unique_access, dumps(data), source) 
-      conn = psycopg2.connect(host=self.host, user=self.usr, password=self.passwd, dbname=self.dbname)
-      conn.autocommit = True 
-      c = conn.cursor() 
-      c.execute(stmt)
-      c.close() 
-   
+      self.c.execute(stmt)
+
+   def _send_to_ip_data(self, data={}, source='AWS'): 
+      """
+      Insert into ip_data `ip_data` in details rather than a JSON object 
+      :args: 
+         data:dict - JSON with data object 
+         source:str - where is the original data from 
+      """
+      check_row="SELECT COUNT(*) FROM ip_data WHERE ip='%s' AND source='%s';" 
+      insert_stmt="INSERT INTO ip_data(ip, source, total_access, access_times, coordiantes, address, places) VALUES ('%s', '%s', %s, '%s', '%s', '%s', '%s');"
+      update_stmt="UPDATE ip_data SET update_timestamp=NOW(), total_access=%s WHERE ip='%s' AND source='%s';" 
+
+      for ip in data.keys(): 
+         self.c.execute(check_row % (ip, source))
+         if c.fetchall()[0][0] == 0: 
+            stmt = insert_stmt % (ip, source, data[ip]['frequency'], data[ip]['timestamp'], data[ip]['coordinates'], data[ip]['address'], data[ip]['places']) 
+            self.c.execute(stmt)
+         else: 
+            stmt = update_stmt % (data[ip]['frequency'], ip, source) 
+            self.c.execute(stmt)
+ 
    def convert_timestamp(self, timestamps=[]) -> str: 
-      """Convert a list of timestamps to a string of timestamps
+      """
+      Convert a list of timestamps to a string of timestamps
       :args:
          timestamps:list - a list of timestamps
       :return: 
@@ -149,11 +152,14 @@ class Main:
       return output
    
    def aws_main(self): 
-      """Retrieve information regarding AWS, send it to database; if valid, print the results"""
+      """
+      Retrieve information regarding AWS, send it to database; if valid, print the results
+      """
       iff = InfoFromFile(file=self.file) 
       tmp = iff.itterate_file() # Get Information from File
       data = {} 
       total_access=0 
+
       for ip in tmp: # Get other information
          li = LocationInfo(ip=ip, api_key=self.api_key, query=self.query, radius=self.radius)
          lat, long = li._get_lat_long() 
@@ -161,10 +167,12 @@ class Main:
          address = li._get_address(lat, long)
          places = li._get_possible_places(lat, long, self.query)
          total_access += len(tmp[ip]["timestamp"])
- 
+         
+         # Store infomration in data 
          data[ip] = {"frequency": len(tmp[ip]["timestamp"]), "timestamp":self.convert_timestamp(tmp[ip]["timestamp"]), "coordinates":coordinates, 
                      "address":address, "places": places} 
 
+ 
          # Print to screen 
          if self.stdout is True: 
             if self.timestamp is True: 
@@ -176,34 +184,8 @@ class Main:
 
       # Send to database
       self._sent_to_historical_data(data=data, total_access=total_access, unique_access=len(data.keys()), source='AWS')
-
-   def github_main(self): 
-      """
-      Retrieve information regarding GitHub, and send it to database
-      If valid, print relevent information
-      """
-      tmp, unique,count=retrieve_github_info(auth=self.auth, org=self.org, repo=self.repo) 
-
-      data={'referral':{'count':tmp['referral'][0]['count'], 'unique':tmp['referral'][0]['uniques'], 'refferer':tmp['referral'][0]['referrer']},
-            'clones':{'count':tmp['clones']['count'], 'unique':tmp['clones']['uniques']}, 'traffic':{'count':tmp['traffic']['count'], 'unique':tmp['traffic']['uniques']}}
-
-      self._sent_to_historical_data(data=data, total_access=data['clones']['count'], unique_access=data['clones']['unique'], source='GitHub') 
-
-      if self.stdout is True: 
-         stmt="\nClones - \n\tTotal: %s | Unique: %s\nTraffic -\n\tTotal: %s | Unique: %s\nReferreral - \n\tTotal: %s | Unique: %s | Origin: %s" 
-         stmt = stmt % (data['clones']['count'], data['clones']['unique'], 
-                       data['traffic']['count'], data['traffic']['unique'], 
-                       data['referral']['count'], data['referral']['unique'], tmp['referral'][0]['referrer'])
-         print(stmt) 
-
-   def main(self): 
-      """
-      Main
-      """
-      # AWS 
-      self.aws_main() 
-      # GitHub
-      self.github_main() 
+      self._send_to_ip_data(data=data, source='AWS')
+      self.c.close() 
 
 class InfoFromFile: 
    def __init__(self, file:str="$HOME/tmp/s3_file.txt"): 
@@ -244,7 +226,7 @@ class InfoFromFile:
          the derived IP address
       """
       IPPattern = re.compile('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}')
-      return re.findall(IPPattern, line)[0]
+      return str(re.findall(IPPattern, line)[0])
 
    def _get_timestamp(self, line:str="")->str:
       """
@@ -336,25 +318,6 @@ class LocationInfo:
             result += dict['name'].replace("'","").replace('"',"") + ", "
          return result
 
-
-def retrieve_github_info(auth=('user@github.com', 'password'), org=None, repo='NewRepo') -> (dict, int, int):
-   """
-   Derive relevent information from github insight
-   :args: 
-      auth:str - authentication information (username/password) 
-      org:str - organization repo is under. If not stated then script automatically assumes that username is org name 
-      repo:str - repository name 
-   :return: 
-      1. Return dict with traffic, clone, and referrel info 
-      2. Return number of distinct clones 
-      3. Return total number of clones  
-   """
-   gh =  GitHub(auth=auth, org=org, repo=repo)
-   data = {"traffic": gh.get_traffic(), "clones": gh.get_clones(), "referral": gh.get_referral()}
-   print(data['clones'])
-   return data, data['clones']['uniques'], data['clones']['count']
-
-
 if __name__ == "__main__": 
    m = Main() 
-   m.main()
+   m.aws_main()

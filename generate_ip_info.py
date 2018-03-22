@@ -131,7 +131,7 @@ class Main:
 
       for ip in data.keys(): 
          self.c.execute(check_row % (ip, source))
-         if c.fetchall()[0][0] == 0: 
+         if self.c.fetchall()[0][0] == 0: 
             stmt = insert_stmt % (ip, source, data[ip]['frequency'], data[ip]['timestamp'], data[ip]['coordinates'], data[ip]['address'], data[ip]['places']) 
             self.c.execute(stmt)
          else: 

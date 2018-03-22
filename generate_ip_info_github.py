@@ -159,7 +159,6 @@ class Main:
 
          # Generate info regarding github and store as a large dict 
          tmp={"traffic": gh.get_traffic(), "clones": gh.get_clones(), "referral": gh.get_referral()}
-         
          # Relevent data Object  
          data={'referral':{'count':tmp['referral'][0]['count'], 'unique':tmp['referral'][0]['uniques'], 'refferer':tmp['referral'][0]['referrer']},
                'clones':{'count':tmp['clones']['count'], 'unique':tmp['clones']['uniques']}, 'traffic':{'count':tmp['traffic']['count'], 'unique':tmp['traffic']['uniques']}}

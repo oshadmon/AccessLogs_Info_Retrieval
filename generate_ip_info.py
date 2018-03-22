@@ -23,7 +23,6 @@ class Main:
       :args: 
          args  (sys.argv):list - Valules declared when calling test (shown in _help method)
       """
-      print("Start %s" % datetime.datetime.now()) 
       if "--help" in sys.argv: 
          self._help()
       self._declare_values(values=sys.argv)
@@ -172,6 +171,18 @@ class Main:
       self.data[ip]['address'] = li.get_address()
       self.data[ip]['places'] = li.get_possible_places()
 
+   def print_output(self):
+      """
+      Print to screen if valid   
+      """
+      for ip in self.data: 
+         if self.timestamp is True:
+            output = "%s -\n\tFrequency: %s\n\tTimestamp: %s\n\tCoordinates: %s\n\tAddress: %s\n\tPlaces: %s"
+            print(output % (ip, self.data[ip]['frequency'], self.data[ip]["timestamp"], self.data[ip]['coordinates'], self.data[ip]['address'], self.data[ip]['places']))
+         else: 
+            output = "%s -\n\tFrequency: %s\n\tCoordinates: %s\n\tAddress: %s\n\tPlaces: %s"
+            print(output % (ip, self.data[ip]['frequency'],  self.data[ip]['coordinates'], self.data[ip]['address'], self.data[ip]['places']))
+   
    def aws_main(self): 
       """
       Retrieve information regarding AWS, send it to database; if valid, print the results
@@ -185,17 +196,19 @@ class Main:
       threads=[]
       for ip in self.data: # Get other information
          threads.append(threading.Thread(target=self.generate_location_info, args=(ip,))) 
-         print(threads)
       for t in threads: 
          t.start() 
       for t in threads: 
          t.join() 
-       
+
       # Send to database
-      print("DB %s" % datetime.datetime.now())
       self._sent_to_historical_data(data=self.data, total_access=total_access, unique_access=unique_access, source='AWS')
       self._send_to_ip_data(data=self.data, source='AWS')
-      self.c.close() 
+      self.c.close()
+       
+      # print to screen 
+      if self.stdout is True: 
+         self.print_output() 
 
 class InfoFromFile: 
    def __init__(self, file:str="$HOME/tmp/s3_file.txt"): 
@@ -325,7 +338,7 @@ class LocationInfo:
       else: 
          for dict in places['results']:
             result += dict['name'].replace("'","").replace('"',"") + ", "
-         return result
+         return result[:-2]
 
 if __name__ == "__main__": 
    m = Main() 

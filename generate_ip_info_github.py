@@ -134,7 +134,7 @@ class Main:
  
       for value in data: 
          self.c.execute(check_count % value['referrer'])
-         if c.fetchall()[0][0] == 0:
+         if self.c.fetchall()[0][0] == 0:
             stmt = insert_stmt % (value['referrer'], value['uniques'], value['count'])
             self.c.execute(stmt)
          else: 

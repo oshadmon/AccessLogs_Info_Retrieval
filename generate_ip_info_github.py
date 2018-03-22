@@ -104,7 +104,7 @@ class Main:
          total_access:int - Total number access 
          unique_access:int - Number of unique access 
       """
-      stmt = "INSERT INTO historical_data(total_access, unique_access, ip_data, from_where) VALUES (%s, %s, '%s', '%s')" 
+      stmt = "INSERT INTO historical_data(total_access, unique_access, ip_data, source) VALUES (%s, %s, '%s', '%s')" 
       stmt = stmt % (total_access, unique_access, dumps(data), source) 
       self.c.execute(stmt)
 
@@ -116,10 +116,18 @@ class Main:
          repo:str - Repository name 
          data:dict - Dictionary of data regarding github 
       """ 
-      inst_stmt = "INSERT INTO github_data(repo, info, total, uniques) VALUES ('%s', '%s', %s, %s);" 
+      check_count="SELECT COUNT(*) FROM github_data WHERE repo='%s' AND info='%s';"
+      insert_stmt ="INSERT INTO github_data(repo, info, total, uniques) VALUES ('%s', '%s', %s, %s);" 
+      update_stmt="UPDATE github_data SET total=%s, uniques=%s, update_timestamp=NOW() WHERE repo='%s' AND info='%s';"
+
       for key in data.keys(): 
-         stmt= inst_stmt % (repo, key, data[key]['count'], data[key]['unique']) 
-         self.c.execute(stmt)
+         self.c.execute(check_count % (repo, key))
+         if self.c.fetchall()[0][0] == 0:
+            stmt= insert_stmt % (repo, key, data[key]['count'], data[key]['unique']) 
+            self.c.execute(stmt)
+         else:
+            stmt = update_stmt % (data[key]['count'], data[key]['unique'], repo, key)
+            self.c.execute(stmt) 
 
    def _send_to_github_referral_list(self, data={}): 
       """
@@ -128,9 +136,9 @@ class Main:
       :args: 
          data:dict - Object with information regarding referrals 
       """
-      check_count="SELECT COUNT(*) FROM github_referral_list WHERE referrer='%s';" 
-      insert_stmt="INSERT INTO github_referral_list(referrer, unique_referrals, count_referrals) VALUES ('%s', %s, %s)" 
-      update_stmt="UPDATE github_referral_list SET unique_referrals=%s, count_referrals=%s, update_timestamp=NOW()  WHERE referrer='%s'" 
+      check_count="SELECT COUNT(*) FROM github_referral_list WHERE referral='%s';" 
+      insert_stmt="INSERT INTO github_referral_list(referral, unique_referrals, count_referrals) VALUES ('%s', %s, %s)" 
+      update_stmt="UPDATE github_referral_list SET unique_referrals=%s, count_referrals=%s, update_timestamp=NOW()  WHERE referral='%s'" 
  
       for value in data: 
          self.c.execute(check_count % value['referrer'])

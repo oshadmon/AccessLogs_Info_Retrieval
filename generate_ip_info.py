@@ -11,6 +11,7 @@ import psycopg2
 import re 
 import requests
 import sys 
+import threading  
 
 from json import dumps 
 from pygeocoder import Geocoder
@@ -22,6 +23,7 @@ class Main:
       :args: 
          args  (sys.argv):list - Valules declared when calling test (shown in _help method)
       """
+      print("Start %s" % datetime.datetime.now()) 
       if "--help" in sys.argv: 
          self._help()
       self._declare_values(values=sys.argv)
@@ -114,7 +116,7 @@ class Main:
          total_access:int - Total number access 
          unique_access:int - Number of unique access 
       """
-      stmt = "INSERT INTO historical_data(total_access, unique_access, ip_data, from_where) VALUES (%s, %s, '%s', '%s')" 
+      stmt = "INSERT INTO historical_data(total_access, unique_access, ip_data, source) VALUES (%s, %s, '%s', '%s')" 
       stmt = stmt % (total_access, unique_access, dumps(data), source) 
       self.c.execute(stmt)
 
@@ -138,7 +140,7 @@ class Main:
             stmt = update_stmt % (data[ip]['frequency'], ip, source) 
             self.c.execute(stmt)
  
-   def convert_timestamp(self, timestamps=[]) -> str: 
+   def convert_timestamp(self, tmp:dict={}) -> dict: 
       """
       Convert a list of timestamps to a string of timestamps
       :args:
@@ -146,45 +148,53 @@ class Main:
       :return: 
          a string of timestamps
       """
-      output = "" 
-      for timestamp in timestamps: 
+      data={}
+      total_count=0
+      for ip in tmp:
+         data[ip]={}
+         output = "" 
+         total_count += len(tmp[ip]['timestamp'])
+         data[ip]['frequency']=len(tmp[ip]['timestamp'])
+         for timestamp in tmp[ip]['timestamp']: 
             output += str(timestamp) +", "
-      return output
-   
+         data[ip]['timestamp']=output[:-2]
+      return data, total_count
+  
+
+   def generate_location_info(self, ip:str='127.0.0.1'): 
+      """
+      Commands to generate information about a given IP address 
+      :args: 
+         ip:str - IP address which is analyzed 
+      """
+      li = LocationInfo(ip=ip, api_key=self.api_key, query=self.query, radius=self.radius)
+      self.data[ip]['coordinates'] = li.get_lat_long()
+      self.data[ip]['address'] = li.get_address()
+      self.data[ip]['places'] = li.get_possible_places()
+
    def aws_main(self): 
       """
       Retrieve information regarding AWS, send it to database; if valid, print the results
       """
       iff = InfoFromFile(file=self.file) 
-      tmp = iff.itterate_file() # Get Information from File
-      data = {} 
-      total_access=0 
-
-      for ip in tmp: # Get other information
-         li = LocationInfo(ip=ip, api_key=self.api_key, query=self.query, radius=self.radius)
-         lat, long = li._get_lat_long() 
-         coordinates = "(%s, %s)" % (str(lat), str(long))
-         address = li._get_address(lat, long)
-         places = li._get_possible_places(lat, long, self.query)
-         total_access += len(tmp[ip]["timestamp"])
-         
-         # Store infomration in data 
-         data[ip] = {"frequency": len(tmp[ip]["timestamp"]), "timestamp":self.convert_timestamp(tmp[ip]["timestamp"]), "coordinates":coordinates, 
-                     "address":address, "places": places} 
-
- 
-         # Print to screen 
-         if self.stdout is True: 
-            if self.timestamp is True: 
-               output = "%s -\n\tFrequency: %s\n\tTimestamp: %s\n\tCoordinates: %s\n\tAddress: %s\n\tPlaces: %s"
-               print(output % (ip, len(data[ip]["timestamp"]), data[ip]["timestamp"], coordinates, address, places))
-            else: 
-               output = "%s -\n\tFrequency: %s\n\tCoordinates: %s\n\tAddress: %s\n\tPlaces: %s"
-               print(output % (ip, len(data[ip]["timestamp"]), coordinates, address, places))
-
+      self.data = iff.itterate_file() # Get Information from File
+      self.data, total_access = self.convert_timestamp(self.data) # total_access: Total number of IPs that accessed  
+      unique_access=len(self.data.keys()) # unique_access: Number of unique IPs that accessed 
+      
+      # Execute generating of information on its own thread 
+      threads=[]
+      for ip in self.data: # Get other information
+         threads.append(threading.Thread(target=self.generate_location_info, args=(ip,))) 
+         print(threads)
+      for t in threads: 
+         t.start() 
+      for t in threads: 
+         t.join() 
+       
       # Send to database
-      self._sent_to_historical_data(data=data, total_access=total_access, unique_access=len(data.keys()), source='AWS')
-      self._send_to_ip_data(data=data, source='AWS')
+      print("DB %s" % datetime.datetime.now())
+      self._sent_to_historical_data(data=self.data, total_access=total_access, unique_access=unique_access, source='AWS')
+      self._send_to_ip_data(data=self.data, source='AWS')
       self.c.close() 
 
 class InfoFromFile: 
@@ -261,7 +271,7 @@ class LocationInfo:
       self.query = query 
       self.radius = radius
 
-   def _get_lat_long(self) -> (float, float): 
+   def get_lat_long(self) -> str: 
       """
       This function connects to the FreeGeoIP web service to get info from IP addresses.
       Returns two latitude and longitude.
@@ -273,23 +283,23 @@ class LocationInfo:
          Return the address and lat/long of each IP accesseing dianomic
          if there is an error then code returns lat/long
       """
-      lat = 0.0
-      long = 0.0
+      self.lat = 0.0
+      self.long = 0.0
       r = requests.get("https://freegeoip.net/json/" + self.ip)
       json_response = r.json()
       if json_response['latitude'] and json_response['longitude']:
-         lat = json_response['latitude']
-         long = json_response['longitude']
-      return lat, long
+         self.lat = json_response['latitude']
+         self.long = json_response['longitude']
+      return "("+str(self.lat)+","+str(self.long)+")" 
 
-   def _get_address(self, lat:float=0.0, long:float=0.0) -> str: 
+   def get_address(self): 
       """
       Based on the latitude and longitutde, generate address
       :return:
          return address:str
       """
       try: 
-         address = self.gmaps.reverse_geocode((lat, long))
+         address = self.gmaps.reverse_geocode((self.lat, self.long))
       except googlemaps.exceptions._RetriableRequest: 
          return "Failed to get Address due to API Key limit. For more info: https://developers.google.com/maps/documentation/javascript/get-api-key" 
       except googlemaps.exceptions.Timeout: 
@@ -300,19 +310,18 @@ class LocationInfo:
          except:
             return ''
 
-   def _get_possible_places(self, lat:float=0.0, long:float=0.0, query:str="lunch") -> str:
+   def get_possible_places(self) -> str:
       """
       Generate a list of places based on the lcation, query, and radius (in meters)
       :args: 
-         query:str - what the user is searching for
       :return:
          "list" of potential places based on query 
       """
       result = ""
       try: 
-         places = self.gmaps.places(query=self.query, location=(lat, long), radius=self.radius)
+         places = self.gmaps.places(query=self.query, location=(self.lat, self.long), radius=self.radius)
       except: 
-         return "Failed to get potential %s places due to API Key limit. For more info: https://developers.google.com/maps/documentation/javascript/get-api-key" % query
+         return "Failed to get potential %s places due to API Key limit. For more info: https://developers.google.com/maps/documentation/javascript/get-api-key" % self.query
       else: 
          for dict in places['results']:
             result += dict['name'].replace("'","").replace('"',"") + ", "

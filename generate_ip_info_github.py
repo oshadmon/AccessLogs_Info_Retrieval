@@ -6,7 +6,7 @@ Description: The following script generates information regarding GitHub
 import datetime
 import googlemaps
 import os
-import psycopg2
+import pymysql 
 import re 
 import requests
 import sys 
@@ -25,8 +25,7 @@ class Main:
          self._help()
       self._declare_values(values=sys.argv)
       # create connection to db (closed in main when everything is done) 
-      conn = psycopg2.connect(host=self.host, user=self.usr, password=self.passwd, dbname=self.dbname)
-      conn.autocommit = True
+      conn = pymysql.connect(host=self.host, user=self.usr, password=self.passwd, db=self.dbname, autocommit=True)
       self.c = conn.cursor()
 
 

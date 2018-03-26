@@ -1,21 +1,21 @@
-DROP TABLE historical_data; 
-DROP TABLE ip_data; 
-DROP TABLE github_data; 
-DROP TABLE github_referral_list; 
+DROP TABLE IF EXISTS historical_data; 
+DROP TABLE IF EXISTS ip_data; 
+DROP TABLE IF EXISTS github_data; 
+DROP TABLE IF EXISTS github_referral_list; 
 
 -- Table containing summary of historical information
 CREATE TABLE historical_data(
    id SERIAL,
-   create_timestamp DATE NOT NULL DEFAULT NOW(),
+   create_timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
    total_access INT NOT NULL DEFAULT 0, -- Total Number of accessed  
    unique_access INT NOT NULL DEFAULT 0, -- Total number of unique accessed 
-   ip_data JSONB NOT NULL DEFAULT '{}'::jsonb, -- copy dict with information regarding everyone that accessed
-   source TEXT DEFAULT 'AWS', -- where is the data from (AWS/GitHub/Other)
+   ip_data JSON NOT NULL, -- copy dict with information regarding everyone that accessed
+   source VARCHAR(255) DEFAULT 'AWS', -- where is the data from (AWS/GitHub/Other)
    PRIMARY KEY(id)
 );
 CREATE INDEX source_index ON historical_data(source); 
  
--- Table with JSON information regarding AWS broken down 
+-- Table with BLOB information regarding AWS broken down 
 -- If ip exists in table then only `total_access` and `frequency` get updated, otherwise keep new row is added  
 CREATE TABLE ip_data(
    id SERIAL, 
@@ -24,10 +24,10 @@ CREATE TABLE ip_data(
    ip VARCHAR(255) NOT NULL DEFAULT '127.0.0.1', 
    source VARCHAR(255) NOT NULL DEFAULT 'AWS', 
    total_access INT NOT NULL DEFAULT 0, -- Total Number of accessed  
-   access_times TEXT NOT NULL DEFAULT '', -- AWS Accessed Timestamps 
-   coordiantes VARCHAR(255) NOT NULL DEFAULT '(0.0, 0.0)', -- Coordinates 
-   address TEXT NOT NULL DEFAULT '', -- Address
-   places TEXT NOT NULL DEFAULT '', -- Places
+   access_times TEXT, -- AWS Accessed Timestamps 
+   coordiantes VARCHAR(255), -- Coordinates 
+   address VARCHAR(255) NOT NULL DEFAULT '', -- Address
+   places TEXT, -- Places
    PRIMARY KEY (id)
 ); 
 CREATE UNIQUE INDEX ip_index ON ip_data(ip); 

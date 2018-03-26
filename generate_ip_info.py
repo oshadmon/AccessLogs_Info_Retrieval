@@ -7,7 +7,7 @@ Description: Using a file of IP addresses and TIMESTAMPs generate information in
 import datetime
 import googlemaps
 import os
-import psycopg2
+import pymysql
 import re 
 import requests
 import sys 
@@ -27,8 +27,7 @@ class Main:
          self._help()
       self._declare_values(values=sys.argv)
       # create connection to db (closed in main when everything is done) 
-      conn = psycopg2.connect(host=self.host, user=self.usr, password=self.passwd, dbname=self.dbname)
-      conn.autocommit = True
+      conn = pymysql.connect(host=self.host, user=self.usr, password=self.passwd, db=self.dbname, autocommit=True, charset='latin1')
       self.c = conn.cursor()
 
    def _help(self, invalid:str=""):
@@ -134,7 +133,10 @@ class Main:
          self.c.execute(check_row % (ip, source))
          if self.c.fetchall()[0][0] == 0: 
             stmt = insert_stmt % (ip, source, data[ip]['frequency'], data[ip]['timestamp'], data[ip]['coordinates'], data[ip]['address'], data[ip]['places']) 
-            self.c.execute(stmt)
+            try: 
+               self.c.execute(stmt)
+            except UnicodeEncodeError:
+               pass
          else: 
             stmt = update_stmt % (data[ip]['frequency'], ip, source) 
             self.c.execute(stmt)

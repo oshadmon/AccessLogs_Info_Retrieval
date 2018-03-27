@@ -189,6 +189,8 @@ class Main:
       """
       iff = InfoFromFile(file=self.file) 
       self.data = iff.itterate_file() # Get Information from File
+      print(self.data)
+      exit(1)
       self.data, total_access = self.convert_timestamp(self.data) # total_access: Total number of IPs that accessed  
       unique_access=len(self.data.keys()) # unique_access: Number of unique IPs that accessed 
       
@@ -260,12 +262,11 @@ class InfoFromFile:
          the derived timestamp
       """
       timestamp = line.split("[")[-1].split("]")[0].split(" +")[0].split(":",1)[0]
-      try:
+      try: 
          timestamp = datetime.datetime.strptime(timestamp, "%d/%b/%Y").strftime("%Y-%m-%d")
-      except ValueException:
-         return timestamp
-      else:
-         return timestamp
+      except ValueError: 
+         pass
+      return timestamp
 
 class LocationInfo: 
    def __init__(self, ip:str='127.0.0.1', api_key:str='aaabbbcccdddeee1112_123fg', query:str='lunch', radius:int=0): 

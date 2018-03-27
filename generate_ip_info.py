@@ -262,12 +262,11 @@ class InfoFromFile:
          the derived timestamp
       """
       timestamp = line.split("[")[-1].split("]")[0].split(" +")[0].split(":",1)[0]
-      try:
+      try: 
          timestamp = datetime.datetime.strptime(timestamp, "%d/%b/%Y").strftime("%Y-%m-%d")
-      except ValueException:
-         return timestamp
-      else:
-         return timestamp
+      except ValueError: 
+         pass
+      return timestamp
 
 class LocationInfo: 
    def __init__(self, ip:str='127.0.0.1', api_key:str='aaabbbcccdddeee1112_123fg', query:str='lunch', radius:int=0): 

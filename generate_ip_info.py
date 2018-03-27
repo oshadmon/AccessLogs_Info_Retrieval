@@ -189,8 +189,6 @@ class Main:
       """
       iff = InfoFromFile(file=self.file) 
       self.data = iff.itterate_file() # Get Information from File
-      print(self.data)
-      exit(1)
       self.data, total_access = self.convert_timestamp(self.data) # total_access: Total number of IPs that accessed  
       unique_access=len(self.data.keys()) # unique_access: Number of unique IPs that accessed 
       

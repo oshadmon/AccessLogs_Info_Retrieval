@@ -30,8 +30,7 @@ CREATE TABLE ip_data(
    places TEXT, -- Places
    PRIMARY KEY (id)
 ); 
-CREATE UNIQUE INDEX ip_index ON ip_data(ip); 
-CREATE INDEX source ON ip_data(source); 
+CREATE INDEX source ON ip_data(source, ip); 
 
 -- Table with information regarding GitHub Repositories 
 CREATE TABLE github_data(

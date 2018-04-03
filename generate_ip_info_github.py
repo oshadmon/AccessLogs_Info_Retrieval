@@ -94,19 +94,6 @@ class Main:
          else: 
             self._help(invalid=value)
        
-   def _sent_to_historical_data(self, data={}, total_access=0, unique_access=0, source=''): 
-      """
-      Implementation sending data to Postgres database rather print 
-      historical_data table is a summary of all the different points where data is coming from 
-      :args: 
-         data:dict - Relevent data as JSON object 
-         total_access:int - Total number access 
-         unique_access:int - Number of unique access 
-      """
-      stmt = "INSERT INTO historical_data(total_access, unique_access, ip_data, source) VALUES (%s, %s, '%s', '%s')" 
-      stmt = stmt % (total_access, unique_access, dumps(data), source) 
-      self.c.execute(stmt)
-
    def _send_to_github_data(self, repo='', data={}): 
       """
       Insert data regarding github into github_data table
@@ -115,18 +102,10 @@ class Main:
          repo:str - Repository name 
          data:dict - Dictionary of data regarding github 
       """ 
-      check_count="SELECT COUNT(*) FROM github_data WHERE repo='%s' AND info='%s';"
       insert_stmt ="INSERT INTO github_data(repo, info, total, uniques) VALUES ('%s', '%s', %s, %s);" 
-      update_stmt="UPDATE github_data SET total=%s, uniques=%s, update_timestamp=NOW() WHERE repo='%s' AND info='%s';"
-
-      for key in data.keys(): 
-         self.c.execute(check_count % (repo, key))
-         if self.c.fetchall()[0][0] == 0:
-            stmt= insert_stmt % (repo, key, data[key]['count'], data[key]['unique']) 
-            self.c.execute(stmt)
-         else:
-            stmt = update_stmt % (data[key]['count'], data[key]['unique'], repo, key)
-            self.c.execute(stmt) 
+      for key in data: 
+         stmt= insert_stmt % (repo, key, data[key]['count'], data[key]['unique']) 
+         self.c.execute(stmt)
 
    def _send_to_github_referral_list(self, data={}): 
       """
@@ -163,7 +142,6 @@ class Main:
                'clones':{'count':tmp['clones']['count'], 'unique':tmp['clones']['uniques']}, 'traffic':{'count':tmp['traffic']['count'], 'unique':tmp['traffic']['uniques']}}
 
          # store to database tables 
-         self._sent_to_historical_data(data=data, total_access=data['clones']['count'], unique_access=data['clones']['unique'], source='GitHub') 
          self._send_to_github_data(repo=repo, data=data) 
          self._send_to_github_referral_list(data=tmp['referral']) 
          

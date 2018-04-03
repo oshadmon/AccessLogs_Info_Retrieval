@@ -1,20 +1,9 @@
-DROP TABLE IF EXISTS historical_data; 
 DROP TABLE IF EXISTS ip_data; 
 DROP TABLE IF EXISTS github_data; 
 DROP TABLE IF EXISTS github_referral_list; 
+DROP TABLE IF EXISTS traffic; 
+DROP TABLE IF EXISTS downloads; 
 
--- Table containing summary of historical information
-CREATE TABLE historical_data(
-   id SERIAL,
-   create_timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
-   total_access INT NOT NULL DEFAULT 0, -- Total Number of accessed  
-   unique_access INT NOT NULL DEFAULT 0, -- Total number of unique accessed 
-   ip_data JSON NOT NULL, -- copy dict with information regarding everyone that accessed
-   source VARCHAR(255) DEFAULT 'AWS', -- where is the data from (AWS/GitHub/Other)
-   PRIMARY KEY(id)
-);
-CREATE INDEX source_index ON historical_data(source); 
- 
 -- Table with BLOB information regarding AWS broken down 
 -- If ip exists in table then only `total_access` and `frequency` get updated, otherwise keep new row is added  
 CREATE TABLE ip_data(
@@ -56,3 +45,24 @@ CREATE TABLE github_referral_list(
    PRIMARY KEY(id)
 ); 
 CREATE UNIQUE INDEX referral_index ON github_referral_list(referral); 
+
+-- Traffic: information regarding traffic from ip_data and github_data 
+-- Note that for ip_data, downloads and traffic are the same
+CREATE TABLE traffic(
+   create_timestamp DATE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   source VARCHAR(255) NOT NULL DEFAULT 'AWS',
+   total_traffic INT NOT NULL DEFAULT 0, 
+   unique_traffic INT NOT NULL DEFAULT 0 
+   KEY(create_timestamp, source) 
+);        
+
+-- Downloads: information regarding downloads from ip_data and github_data 
+-- Note that for ip_data, downloads and traffic are the same
+CREATE TABLE downloads(
+   create_timestamp DATE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   source VARCHAR(255) NOT NULL DEFAULT 'AWS',
+   total_download INT NOT NULL DEFAULT 0,
+   unique_download INT NOT NULL DEFAULT 0
+   KEY(create_timestamp, source)
+);  
+

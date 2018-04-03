@@ -48,6 +48,7 @@ class Main:
            +"\n\t--host: IP address of the PostgresSQL [--host=127.0.0.1]"
            +"\n\t--usr: User and password to connect to postgres [--usr=root:'']"
            +"\n\t--db-name: Name of database being used [--db-name=test]"  
+           +"\n\t--source: Where is the data coming from [--source=AWS]"
            ) 
       exit(1)
 
@@ -77,6 +78,7 @@ class Main:
       self.passwd = '' 
       self.dbname = 'test' 
       self.stdout = False
+      self.source = 'AWS' 
 
       for value in values: 
          if value is sys.argv[0]: 
@@ -100,25 +102,14 @@ class Main:
             self.dbname = str(value.split("=")[-1]) 
          elif "--stdout" in value: 
             self.stdout = True 
+         elif "--source" in value: 
+            self.source=str(value.split("=")[-1])
          else: 
             self._help(invalid=value)
 
       self.file = self.file.replace("$HOME", os.getenv("HOME")).replace("$PWD", os.getenv("PWD")).replace("~", os.path.expanduser('~'))
        
-   def _sent_to_historical_data(self, data={}, total_access=0, unique_access=0, source=''): 
-      """
-      Implementation sending data to Postgres database rather print 
-      historical_data table is a summary of all the different points where data is coming from 
-      :args: 
-         data:dict - Relevent data as JSON object 
-         total_access:int - Total number access 
-         unique_access:int - Number of unique access 
-      """
-      stmt = "INSERT INTO historical_data(total_access, unique_access, ip_data, source) VALUES (%s, %s, '%s', '%s')" 
-      stmt = stmt % (total_access, unique_access, dumps(data), source) 
-      self.c.execute(stmt)
-
-   def _send_to_ip_data(self, data={}, source='AWS'): 
+   def _send_to_ip_data(self, data={}): 
       """
       Insert into ip_data `ip_data` in details rather than a JSON object 
       :args: 
@@ -129,18 +120,19 @@ class Main:
       insert_stmt="INSERT INTO ip_data(ip, source, total_access, access_times, coordiantes, address, places) VALUES ('%s', '%s', %s, '%s', '%s', '%s', '%s');"
       update_stmt="UPDATE ip_data SET update_timestamp=NOW(), total_access=%s WHERE ip='%s' AND source='%s';" 
 
-      for ip in data.keys(): 
-         self.c.execute(check_row % (ip, source))
+      for ip in self.data.keys(): 
+         self.c.execute(check_row % (ip, self.source))
          if self.c.fetchall()[0][0] == 0: 
-            stmt = insert_stmt % (ip, source, data[ip]['frequency'], data[ip]['timestamp'], data[ip]['coordinates'], data[ip]['address'], data[ip]['places']) 
+            stmt = insert_stmt % (ip, self.source, self.data[ip]['frequency'], self.data[ip]['timestamp'], 
+                                  self.data[ip]['coordinates'], self.data[ip]['address'], self.data[ip]['places']) 
             try: 
                self.c.execute(stmt)
             except UnicodeEncodeError:
                pass
          else: 
-            stmt = update_stmt % (data[ip]['frequency'], ip, source) 
+            stmt = update_stmt % (self.data[ip]['frequency'], ip, self.source) 
             self.c.execute(stmt)
- 
+
    def convert_timestamp(self, tmp:dict={}) -> dict: 
       """
       Convert a list of timestamps to a string of timestamps
@@ -204,8 +196,7 @@ class Main:
          t.join() 
 
       # Send to database
-      self._sent_to_historical_data(data=self.data, total_access=total_access, unique_access=unique_access, source='AWS')
-      self._send_to_ip_data(data=self.data, source='AWS')
+      self._send_to_ip_data(data=self.data)
       self.c.close()
        
       # print to screen 
@@ -320,7 +311,7 @@ class LocationInfo:
          return "Failed to get Address due to API Key timeout. For more info: https://developers.google.com/maps/documentation/javascript/get-api-key"
       else: 
          try:
-            return address[0]['formatted_address']
+            return str(address[0]['formatted_address']).replace("'","").replace('"','')
          except:
             return ''
 

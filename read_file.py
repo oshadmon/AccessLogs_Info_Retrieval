@@ -2,7 +2,7 @@ import datetime
 import re 
 
 class InfoFromFile:
-   def __init__(self, file:str="$HOME/tmp/s3_file.txt"):
+   def __init__(self, file_name:str="$HOME/tmp/s3_file.txt"):
       """
       The following class takes a file, and retrieves the IP and access timestamps
       from it. 
@@ -10,7 +10,7 @@ class InfoFromFile:
          file:str - file containing lines of relevent data
          self.data:dict - Object containing IP (key) and timestamps (value list)
       """
-      self.f = file
+      self.f = file_name
       self.data = {}
 
    def itterate_file(self)->dict:
@@ -29,7 +29,7 @@ class InfoFromFile:
          elif ip not in self.data:
             self.data[ip]={"timestamp":[timestamp]}
       f.close()
-      return self.data
+      return self.data 
 
    def _get_ip(self, line:str="")->str:
       """
@@ -58,3 +58,20 @@ class InfoFromFile:
       return timestamp
 
 
+   def _convert_timestamp(self, data:dict={}) -> dict:
+      """
+      Convert a list of timestamps to a string of timestamps
+      :args:
+         timestamps:list - a list of timestamps
+      :return: 
+         a string of timestamps
+      """
+      for ip in data:
+         output = '' 
+         if len(data[ip]['timestamp']) == 1: 
+            data[ip]['timestamp'] = data[ip]['timestamp'][0]
+         else: 
+            for timestamp in data[ip]['timestamp']:
+               output += str(timestamp)+', '
+            data[ip]['timestamp']=output[:-1]
+      return data

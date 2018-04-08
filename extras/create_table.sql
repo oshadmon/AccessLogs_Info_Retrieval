@@ -21,48 +21,36 @@ CREATE TABLE ip_data(
 ); 
 CREATE INDEX source ON ip_data(source, ip); 
 
--- Table with information regarding GitHub Repositories 
-CREATE TABLE github_data(
-   id SERIAL, 
-   create_timestamp TIMESTAMP NOT NULL DEFAULT NOW(), 
-   update_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-   repo VARCHAR(255) NOT NULL DEFAULT 'NewRepo', -- Repository data is coming from 
-   info VARCHAR(255) NOT NULL DEFAULT 'clone', -- Type of data (traffic / clone / reference)
-   total INT NOT NULL DEFAULT 0, 
-   uniques INT NOT NULL DEFAULT 0, 
-   PRIMARY KEY(id) 
-); 
-CREATE UNIQUE INDEX repo_info_index ON github_data(repo, info); 
-
 -- Information regarding referrals 
 CREATE TABLE github_referral_list(
    id SERIAL,
    create_timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
-   update_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   repo VARCHAR(255) NOT NULL DEFAULT 'NewRepo',  
    referral VARCHAR(255) NOT NULL DEFAULT '', 
-   unique_referrals INT NOT NULL DEFAULT 0, 
-   count_referrals INT NOT NULL DEFAULT 0,
+   daily_referrals INT NOT NULL DEFAULT 0, 
+   total_referrals INT NOT NULL DEFAULT 0, 
    PRIMARY KEY(id)
 ); 
-CREATE UNIQUE INDEX referral_index ON github_referral_list(referral); 
 
--- Traffic: information regarding traffic from ip_data and github_data 
--- Note that for ip_data, downloads and traffic are the same
-CREATE TABLE traffic(
-   create_timestamp DATE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-   source VARCHAR(255) NOT NULL DEFAULT 'AWS',
-   total_traffic INT NOT NULL DEFAULT 0, 
-   unique_traffic INT NOT NULL DEFAULT 0 
-   KEY(create_timestamp, source) 
-);        
-
--- Downloads: information regarding downloads from ip_data and github_data 
--- Note that for ip_data, downloads and traffic are the same
+-- Information regarding referrals 
 CREATE TABLE downloads(
-   create_timestamp DATE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-   source VARCHAR(255) NOT NULL DEFAULT 'AWS',
+   id SERIAL,
+   create_timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
+   source VARCHAR(255) NOT NULL DEFAULT 'GitHub', 
+   repo VARCHAR(255) NOT NULL DEFAULT 'NewRepo',
+   daily_download INT NOT NULL DEFAULT 0,
    total_download INT NOT NULL DEFAULT 0,
-   unique_download INT NOT NULL DEFAULT 0
-   KEY(create_timestamp, source)
-);  
+   PRIMARY KEY(id)
+);
+
+-- Information regarding referrals 
+CREATE TABLE traffic(
+   id SERIAL,
+   create_timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
+   source VARCHAR(255) NOT NULL DEFAULT 'GitHub',
+   repo VARCHAR(255) NOT NULL DEFAULT 'NewRepo',
+   daily_traffic INT NOT NULL DEFAULT 0,
+   total_traffic INT NOT NULL DEFAULT 0,
+   PRIMARY KEY(id)
+);
 

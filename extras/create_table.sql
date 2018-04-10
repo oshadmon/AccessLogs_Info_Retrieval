@@ -4,8 +4,7 @@ DROP TABLE IF EXISTS github_referral_list;
 DROP TABLE IF EXISTS traffic; 
 DROP TABLE IF EXISTS downloads; 
 
--- Table with BLOB information regarding AWS broken down 
--- If ip exists in table then only `total_access` and `frequency` get updated, otherwise keep new row is added  
+-- Table with data regarding IP address (frequency, location, potential places) 
 CREATE TABLE ip_data(
    id SERIAL, 
    create_timestamp TIMESTAMP DEFAULT now(), 
@@ -21,7 +20,7 @@ CREATE TABLE ip_data(
 ); 
 CREATE INDEX source ON ip_data(source, ip); 
 
--- Information regarding referrals 
+-- Information regarding GitHub referrals 
 CREATE TABLE github_referral_list(
    id SERIAL,
    create_timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -32,7 +31,7 @@ CREATE TABLE github_referral_list(
    PRIMARY KEY(id)
 ); 
 
--- Information regarding referrals 
+-- Information Downloads
 CREATE TABLE downloads(
    id SERIAL,
    create_timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -43,7 +42,7 @@ CREATE TABLE downloads(
    PRIMARY KEY(id)
 );
 
--- Information regarding referrals 
+-- Information regarding Traffic 
 CREATE TABLE traffic(
    id SERIAL,
    create_timestamp TIMESTAMP NOT NULL DEFAULT NOW(),

@@ -8,28 +8,35 @@ class InfoFromFile:
       from it. 
       :args: 
          file:str - file containing lines of relevent data
-         self.data:dict - Object containing IP (key) and timestamps (value list)
       """
       self.f = file_name
-      self.data = {}
 
    def itterate_file(self)->dict:
       """
       Itterate through a file containing relevent information
       :return:
-         return dict containing IPs and their corresponding timestamps
+         ip_data:dict - A dictionary with ip as keys,and timestamps as values 
+         timestamp_data:dict - A dictionary with timestamps as keys and ip as values
       """
       f = open(self.f, 'r')
+      ip_data = {} 
+      timestamp_data = {}
       for line in f.readlines():
          ip = self._get_ip(line)
          timestamp = self._get_timestamp(line)
-         if ip in self.data and timestamp not in self.data[ip]:
-            if timestamp not in self.data[ip]["timestamp"]:
-               self.data[ip]["timestamp"].append(timestamp)
-         elif ip not in self.data:
-            self.data[ip]={"timestamp":[timestamp]}
+         # iterate by ip and store timestamps into dict 
+         if ip not in ip_data: 
+            ip_data[ip] = {'timestamp':[timestamp]}
+         elif timestamp not in ip_data[ip]['timestamp']:
+            ip_data[ip]['timestamp'].append(timestamp) 
+
+         # iterate by timestamp and store ip into dict 
+         if timestamp not in timestamp_data: 
+            timestamp_data[timestamp] = [ip] 
+         elif ip not in timestamp_data[timestamp]:
+            timestamp_data[timestamp].append(ip)
       f.close()
-      return self.data 
+      return ip_data, timestamp_data 
 
    def _get_ip(self, line:str="")->str:
       """

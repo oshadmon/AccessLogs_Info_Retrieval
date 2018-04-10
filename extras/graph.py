@@ -65,7 +65,7 @@ class GenerateGraph:
          elif "--title" in value:
             self.title = str(value.split("=")[-1]) 
          elif "--query" in value:
-            self.query = str(value.split("=")[-1]) 
+            self.query = str(value.split("=",1)[-1]) 
          elif "--host" in value:
             self.host = str(value.split("=")[-1])
          elif "--usr" in value:
@@ -92,7 +92,6 @@ class GenerateGraph:
       for result in c.fetchall(): 
          results.append(result)
       c.close() 
-
       # Store results from database in dict (0 by default is X, and any consecutive number is the "Y" for that givne X
       column={}
       for v in range(len(results[0])):

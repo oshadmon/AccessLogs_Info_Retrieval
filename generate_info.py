@@ -63,8 +63,8 @@ class GenerateInfo:
             self.db = str(value.split("=")[-1])
          elif "--source" in value: 
             self.source = str(value.split("=")[-1]) 
-         elif "--auth" in value:
-            self.auth = "("+str(value.split("=")[-1])+")"
+         elif "--git-auth" in value:
+            self.auth = (str(value.split("=")[-1].split(":")[0]), str(value.split("=")[-1].split(":")[-1]))
          elif "--org" in value: 
             self.org = str(value.split("=")[-1])
          elif "--repo" in value: 
@@ -89,7 +89,7 @@ class GenerateInfo:
          if self.traffic is True: 
             gii.traffic_ip() 
 
-      if self.source.lower() is 'github':
+      if self.source.lower() == 'github':
          gh = GenerateGitHubInfo(cur=self.c, auth=self.auth, org=self.org, repo=self.repo) 
          gh.github() 
          

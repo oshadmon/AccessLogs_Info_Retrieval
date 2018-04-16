@@ -41,11 +41,13 @@ Files that fall under extra directory are intended to help generate data and res
 **Prerequisites**:
 
 * [Google API Key](https://developers.google.com/maps/documentation/javascript/get-api-key)
+
 * [Postgres](https://www.postgresql.org/download/)
   * [Pgpsycopg2](https://pypi.org/project/psycopg2/) 
-- Or - 
+ Or  
 * [MySQL](https://www.mysql.com/downloads/) 
   * [PyMySQL](https://pypi.org/project/PyMySQL/0.7.4/) 
+
 * [Python3](https://www.python.org)
    * [pip3](https://pip.pypa.io/en/stable/reference/pip_install/)
    * [Google Maps](https://github.com/googlemaps/google-maps-services-python)

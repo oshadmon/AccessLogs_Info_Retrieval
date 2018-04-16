@@ -1,8 +1,6 @@
 #!/bin/bash
 # Installation requirements code 
 apt-get install update
-# Postgres
-apt-get install postgresql
 # Python3 
 apt-get install python3
 # Pip3
@@ -12,6 +10,7 @@ pip3 install pygeocoder
 pip3 install googlemaps3
 pip3 install requests
 pip3 install psycopg2-binary
+pip3 install pymysql 
 # AWS
 pip3 install --upgrade awscli
 

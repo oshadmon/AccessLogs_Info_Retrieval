@@ -9,6 +9,8 @@ class GenerateInfo:
       """
       Generate regarding viistors either from file or GitHub
       """
+      if "--help" in sys.argv: 
+         self._help()
       self._declare_values(values=sys.argv)
       conn = pymysql.connect(host=self.host, port=self.port,  user=self.user, password=self.password, db=self.db, autocommit=True)
       self.c = conn.cursor()
@@ -24,6 +26,7 @@ class GenerateInfo:
          self.passwd:str     - database password 
          self.db:str         - database name 
          self.source:str     - source from which data is derived 
+         self.psql: bool     - write to postgres instead of MySQL 
 
          # GitHub required config 
          self.auth:str       - GitHub Authentication info 
@@ -49,48 +52,76 @@ class GenerateInfo:
       self.file_name='/tmp/output.txt' # For none Git sources  
       self.downloads=True
       self.traffic=True
+      self.psql=False
 
       for value in values: 
          if value is sys.argv[0]: 
             pass 
-         if "--host" in value: 
+         if "--host" in value.lower(): 
             self.host = str(value.split("=")[-1].split(":")[0])
             self.port = int(value.split("=")[-1].split(":")[1])
-         elif "--user" in value: 
+         elif "--user" in value.lower(): 
             self.user     = str(value.split("=")[-1].split(":")[0])
             self.password = str(value.split("=")[-1].split(":")[1])  
-         elif "--db" in value: 
+         elif "--db" in value.lower(): 
             self.db = str(value.split("=")[-1])
-         elif "--source" in value: 
+         elif "--source" in value.lower(): 
             self.source = str(value.split("=")[-1]) 
-         elif "--git-auth" in value:
+         elif "--git-auth" in value.lower():
             self.auth = (str(value.split("=")[-1].split(":")[0]), str(value.split("=")[-1].split(":")[-1]))
-         elif "--org" in value: 
+         elif "--org" in value.lower(): 
             self.org = str(value.split("=")[-1])
-         elif "--repo" in value: 
+         elif "--repo" in value.lower(): 
             self.repo = str(value.split("=")[-1]) 
-         elif "--file-name" in value: 
+         elif "--file-name" in value.lower(): 
             self.file_name = str(value.split("=")[-1])
-         elif "--download" in value: 
+         elif "--download" in value.lower(): 
             self.traffic = False 
-         elif "--traffic" in value: 
+         elif "--traffic" in value.lower(): 
             self.downloads = False 
+         elif "--psql" in value.lower(): 
+            self.psql = True
          else: 
-            pass  
-
+            self._help(value=value) 
+         # If user doesn't specify org, then use authentication username 
          if self.org is "NewOrg":
             self.org = self.auth.split("(")[1].split(",")[0].split("@")[0] 
- 
+
+   def _help(self, value:str=None): 
+      """
+      Generate output with info about requirments
+      :arg:
+         value:str - invalid value  
+      """
+      if value is not None: 
+         print("%s - Invalid variable" % value) 
+      print("Options:"
+           +"\n\t--host: database host and port           [--host=127.0.0.1:3306]"
+           +"\n\t--user: database user and password       [--user=root:passwd]" 
+           +"\n\t--db:   database name                    [--db=test] " 
+           +"\n\t--source: Where the data is coming from  [--source=NewSource]" 
+           +"\n\t--psql: use PostgresSQL instead of MySQL " 
+           +"\n\nGitHub Requirements" 
+           +"\n\t--git-auth: GitHub authentication information                                 [--git-auth=user@githbu.com:password]"
+           +"\n\t--org: Organization that repo falls under (if none then uses GitHub username) [--org=NewOrg]" 
+           +"\n\t--repo: GitHub Repository Name                                                [--repo=NewRepo]"
+           +"\n\nFile based insight" 
+           +"\n\t--fine-name: file name and path with insight                                  [--file-name=$HOME/tmp.txt]" 
+           +"\n\t--downloads: Write only to downloads table (false by default)"  
+           +"\n\t--traffic: Write only to traffic table (false by default)"
+           ) 
+      exit(1) 
+
    def main(self): 
       if self.source.lower() in ['aws', 'website']: 
-         gii = GenerateIPBasedInfo(cur=self.c, file_name=self.file_name, source=self.source) 
+         gii = GenerateIPBasedInfo(cur=self.c, file_name=self.file_name, source=self.source, psql=self.psql) 
          if self.downloads is True: 
             gii.download_ip() 
          if self.traffic is True: 
             gii.traffic_ip() 
 
       if self.source.lower() == 'github':
-         gh = GenerateGitHubInfo(cur=self.c, auth=self.auth, org=self.org, repo=self.repo) 
+         gh = GenerateGitHubInfo(cur=self.c, auth=self.auth, org=self.org, repo=self.repo, psql=self.psql) 
          gh.github() 
          
 
@@ -102,10 +133,4 @@ if __name__ == '__main__':
      gi = GenerateInfo()
      gi.main()
 
-     #gib = GenerateIPBasedInfo() 
-     #gib.aws_ip()
-     #gib.website_ip()
-#     ghi = GenerateGitHubInfo()
-#     for repo in ["FogLAMP","foglamp-gui","foglamp-pkg","foglamp-snap"]: 
-#        ghi.github(auth=('oshadmon@gmail.com', 'OJs071291'), org='foglamp', repo=repo)
 

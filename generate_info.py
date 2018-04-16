@@ -1,5 +1,6 @@
-import sys 
+import psycopg2
 import pymysql 
+import sys 
 
 from generate_ip_info     import GenerateIPBasedInfo
 from generate_github_info import GenerateGitHubInfo
@@ -12,8 +13,13 @@ class GenerateInfo:
       if "--help" in sys.argv: 
          self._help()
       self._declare_values(values=sys.argv)
-      conn = pymysql.connect(host=self.host, port=self.port,  user=self.user, password=self.password, db=self.db, autocommit=True)
-      self.c = conn.cursor()
+      if self.psql is True: 
+         conn = psycopg2.connect(host=self.host, port=self.port, user=self.user, password=self.password, dbname=self.db) 
+         conn.autocommit = True
+         self.c.cursor() 
+      else: 
+         conn = pymysql.connect(host=self.host, port=self.port,  user=self.user, password=self.password, db=self.db, autocommit=True)
+         self.c = conn.cursor()
 
    def _declare_values(self, values:list=[]): 
       """
@@ -114,14 +120,14 @@ class GenerateInfo:
 
    def main(self): 
       if self.source.lower() in ['aws', 'website']: 
-         gii = GenerateIPBasedInfo(cur=self.c, file_name=self.file_name, source=self.source, psql=self.psql) 
+         gii = GenerateIPBasedInfo(cur=self.c, file_name=self.file_name, source=self.source) 
          if self.downloads is True: 
             gii.download_ip() 
          if self.traffic is True: 
             gii.traffic_ip() 
 
       if self.source.lower() == 'github':
-         gh = GenerateGitHubInfo(cur=self.c, auth=self.auth, org=self.org, repo=self.repo, psql=self.psql) 
+         gh = GenerateGitHubInfo(cur=self.c, auth=self.auth, org=self.org, repo=self.repo) 
          gh.github() 
          
 

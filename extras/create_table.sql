@@ -27,7 +27,6 @@ CREATE TABLE github_referral_list(
    repo VARCHAR(255) NOT NULL DEFAULT 'NewRepo',  
    referral VARCHAR(255) NOT NULL DEFAULT '', 
    daily_referrals INT NOT NULL DEFAULT 0, 
-   total_referrals INT NOT NULL DEFAULT 0, 
    PRIMARY KEY(id)
 ); 
 
@@ -38,7 +37,6 @@ CREATE TABLE downloads(
    source VARCHAR(255) NOT NULL DEFAULT 'GitHub', 
    repo VARCHAR(255) NOT NULL DEFAULT 'NewRepo',
    daily_download INT NOT NULL DEFAULT 0,
-   total_download INT NOT NULL DEFAULT 0,
    PRIMARY KEY(id)
 );
 
@@ -49,7 +47,6 @@ CREATE TABLE traffic(
    source VARCHAR(255) NOT NULL DEFAULT 'GitHub',
    repo VARCHAR(255) NOT NULL DEFAULT 'NewRepo',
    daily_traffic INT NOT NULL DEFAULT 0,
-   total_traffic INT NOT NULL DEFAULT 0,
    PRIMARY KEY(id)
 );
 

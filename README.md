@@ -1,15 +1,25 @@
 **Description**:
 
-The following project is intended to help with understanding web traffic. In this instance the script takes IP address and timestamps, and then returns geolocation, and potential places based on user defined queries. This tool is intended to assist understanding of who accessed a given site.
+The following proejct is an open source tool to help people understand traction on different platform; in specific Website, GitHub, and Downloads. 
 
+Traffic type is decided by the user, while traffic data by a user defined file. The output file should contain TIMESTAMP, and IP addresses. That way, 
+it is relativly easy to calculate the frequency both by IP, and over time.  
 
+```
+# Example 1 - AWS S3 bucket file
+94b0d7bdce49506054db00c7ed077b7600249ec3841c7afff89cdc3f06544e61 website [02/Feb/2018:14:56:56 +0000] 151.21.81.169 - 7BB2C5A8D6C53EAD REST.GET.OBJECT snaps/x86_64/website.info "GET /website/snaps/x86_64/website.info HTTP/1.1" 200 - 6 6 15 15 "-" "Wget/1.17.1 (linux-gnu)" -
+
+# Example 2 - WP Engine Apache file 
+180.76.15.139 - - [10/Apr/2018:00:42:52 +0000] "GET /contact-us/ HTTP/1.0" 301 - "-" "Mozilla/5.0 (compatible; Baiduspider/2.0; +http://www.baidu.com/search/spider.html)"t
+```
+
+Alternativly, the program can also calculate traffic for a GitHub repository. In this case, all that's required is GitHub user and password, organization name, and repository name. 
+Like with a given file, the program than calculates traffic and clones; and stores them in a database. Additionally, the program also generates insight regarding where traffic is coming from under refrences. 
+
+[Output Examples](#Process-&-Example)
+  
 **Files**:
 
-* generate_ip_info.py - The generate_ip_info script takes a file containing IP and timestamps, and iterates through them to find geolocation, and potential near by places (defined by query). It then takes the relevant information, and sends it into a database table such that it is easily retrieved, and accessible.
-* generate_ip_info_github.py - Generate information regarding GitHub 
-* install.sh - installation script for all prerequisites. The script doesn't not configure AWS 
-* extras/create_table.sql - SQL table and initial line required for generate_ip_info.py
-* extras/retrive_from_aws_s3.sh - Using AWS bucket URL retrieve all information from bucket (files). The files are merged into one (1) file to be used by generate_ip_info.py.
 
 **Prerequisites**:
 

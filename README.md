@@ -16,7 +16,7 @@ it is relativly easy to calculate the frequency both by IP, and over time.
 Alternativly, the program can also calculate traffic for a GitHub repository. In this case, all that's required is GitHub user and password, organization name, and repository name. 
 Like with a given file, the program than calculates traffic and clones; and stores them in a database. Additionally, the program also generates insight regarding where traffic is coming from under refrences. 
 
-[Output Examples](#Process-&-Example)
+[Test Samples](#Examples)
   
 **Files**:
 
@@ -34,7 +34,7 @@ Like with a given file, the program than calculates traffic and clones; and stor
 
 Alternatively one can run ```sudo bash $HOME/AccessLogs_Info_Retrieval/extras/install.sh```
 
-**Process & Example** 
+**Example** 
 
 In order for repository to work the user must execute the following  
 Install prerequisites & Configure AWS

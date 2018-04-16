@@ -10,17 +10,24 @@ from pygeocoder import Geocoder
 
 
 class GenerateIPBasedInfo: 
-   def __init__(self, cur:pymysql.cursors.Cursor=None, file_name:str='/tmp/output.txt', source='NewSource'): 
+   def __init__(self, cur:pymysql.cursors.Cursor=None, file_name:str='/tmp/output.txt', source='NewSource', 
+                api_key='aaabbbcccdddeee1112_123fg',query='lumch', radius=0): 
       """
       The following class uses a files, containing IP and timestamps, to generate insight regarding visitors
       :args: 
          self.c:pymysql.cursors.Cursor - MySQL connection cursor 
          self.file_name:str - file path with data 
-         self.source:str - source where data is from (AWS, Website, etc.)) 
+         self.source:str - source where data is from (AWS, Website, etc.)
+         self.api_key:str - Google Map's API key
+         self.query:str - Places that fall under a given category
+         self.radius:int - Distance from origin  
       """
       self.c = cur 
       self.file_name = file_name
       self.source=source 
+      self.api_key=api
+      self.query=query
+      self.radius=raidus 
 
    def download_ip(self): 
       """
@@ -61,7 +68,7 @@ class GenerateIPBasedInfo:
       :args: 
          ip:str - IP address which is analyzed 
       """
-      li = LocationInfo(ip=ip, api_key='AIzaSyA2wFqcg5NG3CiQDIevIVvBmAK-rQxjp8U', query='VC', radius=0)
+      li = LocationInfo(ip=ip, api_key=self.api_key, query=self.query, radius=self.radius)
       self.ip_data[ip]['coordinates'] = li.get_lat_long()
       self.ip_data[ip]['address'] = li.get_address()
       self.ip_data[ip]['places'] = li.get_possible_places()
@@ -234,11 +241,13 @@ class LocationInfo:
          gmaps:str - Google's API key to use Google Maps API (https://developers.google.com/maps/documentation/javascript/get-api-key)
          query: str - The type of location to check. 
          radius:int - In meters how far from source to check  
+         api_key:str - Google's Maps API key 
       """
       self.ip = ip
       self.gmaps = googlemaps.Client(key=api_key)
       self.query = query
       self.radius = radius
+      self.api_key=api_key
 
    def get_lat_long(self) -> str:
       """

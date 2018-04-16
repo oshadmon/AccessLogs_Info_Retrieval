@@ -34,14 +34,14 @@ Like with a given file, the program than calculates traffic and clones; and stor
 Files that fall under extra directory are intended to help generate data and results, but are not executed as part of the core of the project
 * create_table.sql -  The following contains the create statements for the tables in which data will be stored. It is ideal to create these tables only
                       once, and then reuse them each time for better results. 
-* install.sh - The following file assists with installing different components need to run code
+* install.sh - The following file assists with installing different components need to run code. It DOES NOT install MySQL or Postgres Database
 * graph.py - Given a query generate graph with given results; based on data generated from files and/or GitHub.  
 * retrieve_from_aws_s3.sh - In cases where AWS S3 is used the following helps store data into a single file 
 
 **Prerequisites**:
 
 * [Google API Key](https://developers.google.com/maps/documentation/javascript/get-api-key)
-* [Postgres](https://www.postgresql.org/download/) OR [MySQL](https://www.mysql.com/downloads/)
+* [Postgres](https://www.postgresql.org/download/) or [MySQL](https://www.mysql.com/downloads/)
   * [Pgpsycopg2](https://pypi.org/project/psycopg2/) 
   * [PyMySQL](https://pypi.org/project/PyMySQL/0.7.4/) 
 * [Python3](https://www.python.org)
@@ -55,3 +55,74 @@ Alternatively one can run ```sudo bash $HOME/AccessLogs_Info_Retrieval/extras/in
 
 **Example** 
 
+* Help Options
+```
+Options:
+	--host: database host and port           [--host=127.0.0.1:3306]
+	--user: database user and password       [--user=root:passwd]
+	--db:   database name                    [--db=test] 
+	--source: Where the data is coming from  [--source=NewSource]
+	--psql: use PostgresSQL instead of MySQL 
+
+GitHub Requirements
+	--git-auth: GitHub authentication information                                 [--git-auth='user@githbu.com':'password']
+	--org: Organization that repo falls under (if none then uses GitHub username) [--org=NewOrg]
+	--repo: GitHub Repository Name                                                [--repo=NewRepo]
+
+File based insight
+	--fine-name: file name and path with insight                                  [--file-name=$HOME/tmp.txt]
+	--api-key: Google's API Key                                                   [--api-key=AAABBBCCC-123]
+	--query: Category location falls under                                        [--query='lunch spot']
+	--radius: Distance from origin                                                [--radius=0]
+	--downloads: Write only to downloads table (false by default)
+	--traffic: Write only to traffic table (false by default)
+```
+
+* Read from file to downloads table 
+```
+~/AccessLogs_Info_Retrieval$ python3 generate_info.py  --host=127.0.0.1:3306 --user=root:passwd --db=test --source=AWS --file-name=$HOME/data/output.txt --api-key=AAABBBCCC-123 --query='lunch' --radius=0  --downloads 
+
+-- Output 
+mysql> select * from downloads order by id;
++----+---------------------+--------+------+----------------+
+| id | create_timestamp    | source | repo | daily_download |
++----+---------------------+--------+------+----------------+
+|  1 | 2018-02-01 00:00:00 | AWS    |      |              1 |
+|  2 | 2018-02-07 00:00:00 | AWS    |      |              7 |
+|  3 | 2018-03-21 00:00:00 | AWS    |      |              4 |
+|  4 | 2018-01-29 00:00:00 | AWS    |      |              4 |
+|  5 | 2018-04-05 00:00:00 | AWS    |      |             11 |
+|  6 | 2018-04-11 00:00:00 | AWS    |      |              5 |
+|  7 | 2018-02-12 00:00:00 | AWS    |      |              5 |
+...
+```
+
+* Read from file to traffic table 
+```
+~/AccessLogs_Info_Retrieval$ python3 generate_info.py --host=127.0.0.1:3306 --user=root:passwd --db=test --source=Website --file-name=/home/webinfo/website_apache_logs-2018-04-16_21-08-31.txt --api-key=AAABBBCCC-123 --query='lunch' --radius=0 --traffic
+
+-- Output 
+mysql> select * from traffic;
++----+---------------------+---------+--------------+---------------+
+| id | create_timestamp    | source  | repo         | daily_traffic |
++----+---------------------+---------+--------------+---------------+
+|  1 | 2018-04-09 16:29:05 | GitHub  | foglamp-pkg  |             2 |
+|  2 | 2018-04-09 16:29:06 | GitHub  | foglamp-snap |             7 |
+|  3 | 2018-04-09 16:29:04 | GitHub  | foglamp-gui  |            38 |
+|  4 | 2018-03-26 00:00:00 | Website |              |            50 |
+``` 
+
+* Running GitHub Command - since GitHub sends data to downloads, traffic, and referrals, the example will just show referrals
+```
+~/AccessLogs_Info_Retrieval$ python3 generate_info.py --host=127.0.0.1:3306 --user=root:foglamp --db=test2 --source=GitHub --git-auth='user@github.com':'passwd' --org=NewOrg --repo=NewRepo
+
+-- Output
+mysql> select * from github_referral_list; 
++----+---------------------+--------------+------------------------+-----------------+
+| id | create_timestamp    | repo         | referral               | daily_referrals |
++----+---------------------+--------------+------------------------+-----------------+
+|  1 | 2018-04-09 16:29:03 | NewRepo      | github.com             |              20 |
+|  2 | 2018-04-09 16:29:03 | NewRepo      | Google                 |              21 |
+|  3 | 2018-04-09 16:29:03 | NewRepo      | Bing                   |               7 |
+|  4 | 2018-04-09 16:29:03 | NewRepo      | website                |               8 |``` 
+```

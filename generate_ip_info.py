@@ -1,144 +1,109 @@
-"""
-By: Ori Shadmon 
-Date: February 2018 
-Description: Using a file of IP addresses and TIMESTAMPs generate information in terms of location and potential places. 
-""" 
-
-import datetime
+import datetime 
 import googlemaps
-import os
-import psycopg2
+import pymysql
 import re 
 import requests
-import sys 
+import threading
+import warnings
 
-from json import dumps 
+from json import dumps
 from pygeocoder import Geocoder
 
-class Main: 
-   def __init__(self, *args): 
-      """
-      The following class controls the processes by which everything runs
-      :args: 
-         args  (sys.argv):list - Valules declared when calling test (shown in _help method)
-      """
-      if "--help" in sys.argv: 
-         self._help()
-      self._declare_values(values=sys.argv)
-      # create connection to db (closed in main when everything is done) 
-      conn = psycopg2.connect(host=self.host, user=self.usr, password=self.passwd, dbname=self.dbname)
-      conn.autocommit = True
-      self.c = conn.cursor()
+warnings.filterwarnings("ignore")
 
-   def _help(self, invalid:str=""):
+class GenerateIPBasedInfo: 
+   def __init__(self, cur:pymysql.cursors.Cursor=None, file_name:str='/tmp/output.txt', source='NewSource', 
+                api_key='aaabbbcccdddeee1112_123fg',query='lumch', radius=0): 
       """
-      Print options to screen and exit
+      The following class uses a files, containing IP and timestamps, to generate insight regarding visitors
       :args: 
-         invalid:str - If the user wants an option that isn't supported, then a corresponding error is printed 
+         self.c:pymysql.cursors.Cursor - MySQL connection cursor 
+         self.file_name:str - file path with data 
+         self.source:str - source where data is from (AWS, Website, etc.)
+         self.api_key:str - Google Map's API key
+         self.query:str - Places that fall under a given category
+         self.radius:int - Distance from origin  
+      """
+      self.c = cur 
+      self.file_name = file_name
+      self.source=source 
+      self.api_key=api_key
+      self.query=query
+      self.radius=radius 
+
+   def download_ip(self): 
+      """
+      Generate information from file that contains download information
+      """
+      iff = InfoFromFile(file_name=self.file_name) 
+      self.ip_data, self.timestamp_data = iff.itterate_file() # Get Information from File
+      threads=[]
+      for ip in self.ip_data: # Get other information
+        threads.append(threading.Thread(target=self._generate_location_info, args=(ip,)))
+      for t in threads:
+         t.start()
+      for t in threads:
+         t.join()
+      self._send_to_ip_data() 
+      self._send_to_download() 
+
+   def traffic_ip(self):
       """ 
-      if invalid is not "":
-         print("Exception - '%s' is not supported\n" % str(invalid))
-      print("Option List: "
-           +"\n\t--file: log file containing relevent information [--file=$HOME/tmp/site_logs.txt]"
-           +"\n\t--api-key: Google's API key to use Google Maps API [--api-key=aaaBcD123kd-d83c-C83s]"
-           +"\n\t--query: The type of location to check [--query=lunch]"
-           +"\n\t--radius: In meters how far from source to check [--radius=0]"
-           +"\n\t--timestamp:  Print a list the accessed timestamps per IP. If set to False (default), then print only the number of times that IP accessed the website"
-           +"\n\t--stdout: print to screen otherwise will just store to database (default false)" 
-           +"\n\t--host: IP address of the PostgresSQL [--host=127.0.0.1]"
-           +"\n\t--usr: User and password to connect to postgres [--usr=root:'']"
-           +"\n\t--db-name: Name of database being used [--db-name=test]"  
-           ) 
-      exit(1)
-
-   def _declare_values(self, values:list=[]): 
+      Generate information from file that contains traffic information
       """
-      Declare values that are used through the program
-      :args:
-         file:str - File logs file containing relevent information
-         api_key:str - Google's API key to use Google Maps API (https://developers.google.com/maps/documentation/javascript/get-api-key)
-         query:str - The type of location to check.
-         radius:str - In meters how far from source to check 
-         timestamp:boolean - Return a list the accessed timestamps per IP. If set to False (default), then print only the number of times
-	                     that IP accessed the website
-         host:str - IP address of the PostgresSQL
-         user:str - User of the PostgresSQL  
-         pass:string - password of PostgresSQL user 
-         dbname:str - database name  
-         stdout:boolean - Print output to screen 
-      """
-      self.file = "$HOME/tmp/site_logs.txt"
-      self.api_key = "aaaBcD123kd-d83c-C83s" # The API Key is invalid, user must include a valid IP for code to work
-      self.query = "lunch" 
-      self.radius = 0
-      self.timestamp = False
-      self.host = '127.0.0.1' 
-      self.usr = 'root' 
-      self.passwd = '' 
-      self.dbname = 'test' 
-      self.stdout = False
+      iff = InfoFromFile(file_name=self.file_name)
+      self.ip_data, self.timestamp_data = iff.itterate_file() # Get Information from File
+      threads=[]
+      for ip in self.ip_data: # Get other information
+        threads.append(threading.Thread(target=self._generate_location_info, args=(ip,)))
+      for t in threads:
+         t.start()
+      for t in threads:
+         t.join()
+      self._send_to_ip_data()
+      self._send_to_traffic()
 
-      for value in values: 
-         if value is sys.argv[0]: 
-            pass 
-         elif "--file" in value: 
-            self.file = value.split("=")[-1]
-         elif "--api-key" in value: 
-            self.api_key = value.split("=")[-1]
-         elif "--query" in value: 
-            self.query = value.split("=")[-1]
-         elif "--radius" in value: 
-            self.radius = int(value.split("=")[-1]) 
-         elif "--timestamp" in value: 
-            self.timestamp = True
-         elif "--host" in value: 
-            self.host = str(value.split("=")[-1]) 
-         elif "--usr" in value: 
-            self.usr = str(value.split("=")[-1].split(":")[0]) 
-            self.passwd = str(value.split("=")[-1].split(":")[-1]) 
-         elif "--db-name" in value:
-            self.dbname = str(value.split("=")[-1]) 
-         elif "--stdout" in value: 
-            self.stdout = True 
-         else: 
-            self._help(invalid=value)
 
-      self.file = self.file.replace("$HOME", os.getenv("HOME")).replace("$PWD", os.getenv("PWD")).replace("~", os.path.expanduser('~'))
-       
-   def _sent_to_historical_data(self, data={}, total_access=0, unique_access=0, source=''): 
+   def _generate_location_info(self, ip:str='127.0.0.1'):
       """
-      Implementation sending data to Postgres database rather print 
-      historical_data table is a summary of all the different points where data is coming from 
+      Commands to generate information about a given IP address 
       :args: 
-         data:dict - Relevent data as JSON object 
-         total_access:int - Total number access 
-         unique_access:int - Number of unique access 
+         ip:str - IP address which is analyzed 
       """
-      stmt = "INSERT INTO historical_data(total_access, unique_access, ip_data, from_where) VALUES (%s, %s, '%s', '%s')" 
-      stmt = stmt % (total_access, unique_access, dumps(data), source) 
-      self.c.execute(stmt)
+      li = LocationInfo(ip=ip, api_key=self.api_key, query=self.query, radius=self.radius)
+      self.ip_data[ip]['coordinates'] = li.get_lat_long()
+      self.ip_data[ip]['address'] = li.get_address()
+      self.ip_data[ip]['places'] = li.get_possible_places()
 
-   def _send_to_ip_data(self, data={}, source='AWS'): 
+   def _send_to_ip_data(self):
       """
       Insert into ip_data `ip_data` in details rather than a JSON object 
-      :args: 
-         data:dict - JSON with data object 
-         source:str - where is the original data from 
       """
-      check_row="SELECT COUNT(*) FROM ip_data WHERE ip='%s' AND source='%s';" 
-      insert_stmt="INSERT INTO ip_data(ip, source, total_access, access_times, coordiantes, address, places) VALUES ('%s', '%s', %s, '%s', '%s', '%s', '%s');"
-      update_stmt="UPDATE ip_data SET update_timestamp=NOW(), total_access=%s WHERE ip='%s' AND source='%s';" 
+      check_row="SELECT COUNT(*) FROM ip_data WHERE ip='%s' AND source='%s';"
+      insert_stmt=("INSERT INTO ip_data(create_timestamp, update_timestamp, ip, source, total_access, access_times, coordiantes, address, places) VALUES " 
+                  +"('%s', '%s', '%s', '%s', %s, '%s', '%s', '%s', '%s');")
 
-      for ip in data.keys(): 
-         self.c.execute(check_row % (ip, source))
-         if c.fetchall()[0][0] == 0: 
-            stmt = insert_stmt % (ip, source, data[ip]['frequency'], data[ip]['timestamp'], data[ip]['coordinates'], data[ip]['address'], data[ip]['places']) 
-            self.c.execute(stmt)
-         else: 
-            stmt = update_stmt % (data[ip]['frequency'], ip, source) 
-            self.c.execute(stmt)
- 
-   def convert_timestamp(self, timestamps=[]) -> str: 
+      update_stmt="UPDATE ip_data SET  update_timestamp='%s', total_access=%s, access_times='%s' WHERE ip='%s' AND source='%s';"
+
+      for ip in self.ip_data.keys():
+         self.c.execute(check_row % (ip, self.source))
+         if self.c.fetchall()[0][0] == 0:
+            stmt = insert_stmt % (sorted(self.ip_data[ip]['timestamp'])[0], sorted(self.ip_data[ip]['timestamp'])[-1], ip, self.source, 
+                                  len(self.ip_data[ip]['timestamp']), self._convert_timestamp(sorted(self.ip_data[ip]['timestamp'])), 
+                                  self.ip_data[ip]['coordinates'], self.ip_data[ip]['address'], self.ip_data[ip]['places'])
+            try:
+               self.c.execute(stmt)
+            except:
+               pass
+         else:
+            stmt = update_stmt % (sorted(self.ip_data[ip]['timestamp'])[-1], len(self.ip_data[ip]['timestamp']), 
+                                  self._convert_timestamp(sorted(self.ip_data[ip]['timestamp'])), ip, self.source)
+            try: 
+               self.c.execute(stmt)
+            except: 
+               pass 
+
+   def _convert_timestamp(self, timestamps:list=[]) -> str:
       """
       Convert a list of timestamps to a string of timestamps
       :args:
@@ -146,78 +111,81 @@ class Main:
       :return: 
          a string of timestamps
       """
-      output = "" 
-      for timestamp in timestamps: 
-            output += str(timestamp) +", "
-      return output
+      output='' 
+      for timestamp in timestamps:
+         output += timestamp +', '
+      return output[:-1]
    
-   def aws_main(self): 
+   def _send_to_download(self): 
       """
-      Retrieve information regarding AWS, send it to database; if valid, print the results
+      Send data generated from file into downloads table 
       """
-      iff = InfoFromFile(file=self.file) 
-      tmp = iff.itterate_file() # Get Information from File
-      data = {} 
-      total_access=0 
+      insert_stmt = "INSERT INTO downloads(create_timestamp, source, repo, daily_download) VALUES ('%s', '%s', '', %s);" 
+      check_stmt = "SELECT COUNT(*) FROM downloads WHERE DATE(create_timestamp) = DATE('%s') AND source='%s';" 
 
-      for ip in tmp: # Get other information
-         li = LocationInfo(ip=ip, api_key=self.api_key, query=self.query, radius=self.radius)
-         lat, long = li._get_lat_long() 
-         coordinates = "(%s, %s)" % (str(lat), str(long))
-         address = li._get_address(lat, long)
-         places = li._get_possible_places(lat, long, self.query)
-         total_access += len(tmp[ip]["timestamp"])
-         
-         # Store infomration in data 
-         data[ip] = {"frequency": len(tmp[ip]["timestamp"]), "timestamp":self.convert_timestamp(tmp[ip]["timestamp"]), "coordinates":coordinates, 
-                     "address":address, "places": places} 
+      for timestamp in self.timestamp_data: 
+         self.c.execute(check_stmt % (timestamp, self.source))
+         count = self.c.fetchall()[0][0]
+         if count == 0: 
+            stmt = insert_stmt % (timestamp, self.source, len(self.timestamp_data[timestamp]))
+            self.c.execute(stmt)
 
- 
-         # Print to screen 
-         if self.stdout is True: 
-            if self.timestamp is True: 
-               output = "%s -\n\tFrequency: %s\n\tTimestamp: %s\n\tCoordinates: %s\n\tAddress: %s\n\tPlaces: %s"
-               print(output % (ip, len(data[ip]["timestamp"]), data[ip]["timestamp"], coordinates, address, places))
-            else: 
-               output = "%s -\n\tFrequency: %s\n\tCoordinates: %s\n\tAddress: %s\n\tPlaces: %s"
-               print(output % (ip, len(data[ip]["timestamp"]), coordinates, address, places))
+   def _send_to_traffic(self):
+      """
+      Generate data generated from file into traffic table 
+      """ 
+      insert_stmt = "INSERT INTO traffic(create_timestamp, source, repo, daily_traffic) VALUES ('%s', '%s', '', %s);"
+      check_stmt = "SELECT COUNT(*) FROM traffic WHERE DATE(create_timestamp) = DATE('%s') AND source='%s';"
 
-      # Send to database
-      self._sent_to_historical_data(data=data, total_access=total_access, unique_access=len(data.keys()), source='AWS')
-      self._send_to_ip_data(data=data, source='AWS')
-      self.c.close() 
+      for timestamp in self.timestamp_data:
+         self.c.execute(check_stmt % (timestamp, self.source))
+         count = self.c.fetchall()[0][0]
+         if count == 0:
+            stmt = insert_stmt % (timestamp, self.source, len(self.timestamp_data[timestamp]))
+            try: 
+               self.c.execute(stmt)
+            except: 
+               pass
 
-class InfoFromFile: 
-   def __init__(self, file:str="$HOME/tmp/s3_file.txt"): 
+
+class InfoFromFile:
+   def __init__(self, file_name:str="$HOME/tmp/s3_file.txt"):
       """
       The following class takes a file, and retrieves the IP and access timestamps
       from it. 
       :args: 
          file:str - file containing lines of relevent data
-         self.data:dict - Object containing IP (key) and timestamps (value list)
-      """    
-      self.f = file 
-      self.data = {}
+      """
+      self.f = file_name
 
-   def itterate_file(self)->dict: 
+   def itterate_file(self)->dict:
       """
       Itterate through a file containing relevent information
       :return:
-         return dict containing IPs and their corresponding timestamps
+         ip_data:dict - A dictionary with ip as keys,and timestamps as values 
+         timestamp_data:dict - A dictionary with timestamps as keys and ip as values
       """
       f = open(self.f, 'r')
-      for line in f.readlines(): 
+      ip_data = {}
+      timestamp_data = {}
+      for line in f.readlines():
          ip = self._get_ip(line)
          timestamp = self._get_timestamp(line)
-         if ip in self.data and timestamp not in self.data[ip]: 
-            if timestamp not in self.data[ip]["timestamp"]: 
-               self.data[ip]["timestamp"].append(timestamp)
-         elif ip not in self.data: 
-            self.data[ip]={"timestamp":[timestamp]}
-      f.close()
-      return self.data 
+         # iterate by ip and store timestamps into dict 
+         if ip not in ip_data:
+            ip_data[ip] = {'timestamp':[timestamp]}
+         elif timestamp not in ip_data[ip]['timestamp']:
+            ip_data[ip]['timestamp'].append(timestamp)
 
-   def _get_ip(self, line:str="")->str: 
+         # iterate by timestamp and store ip into dict 
+         if timestamp not in timestamp_data:
+            timestamp_data[timestamp] = [ip]
+         elif ip not in timestamp_data[timestamp]:
+            timestamp_data[timestamp].append(ip)
+      f.close()
+      return ip_data, timestamp_data
+
+   def _get_ip(self, line:str="")->str:
       """
       Retrieve IP address from line
       :args:
@@ -239,13 +207,31 @@ class InfoFromFile:
       timestamp = line.split("[")[-1].split("]")[0].split(" +")[0].split(":",1)[0]
       try:
          timestamp = datetime.datetime.strptime(timestamp, "%d/%b/%Y").strftime("%Y-%m-%d")
-      except ValueException:
-         return timestamp
-      else:
-         return timestamp
+      except ValueError:
+         pass
+      return timestamp
 
-class LocationInfo: 
-   def __init__(self, ip:str='127.0.0.1', api_key:str='aaabbbcccdddeee1112_123fg', query:str='lunch', radius:int=0): 
+
+   def _convert_timestamp(self, data:dict={}) -> dict:
+      """
+      Convert a list of timestamps to a string of timestamps
+      :args:
+         timestamps:list - a list of timestamps
+      :return: 
+         a string of timestamps
+      """
+      for ip in data:
+         output = ''
+         if len(data[ip]['timestamp']) == 1:
+            data[ip]['timestamp'] = data[ip]['timestamp'][0]
+         else:
+            for timestamp in data[ip]['timestamp']:
+               output += str(timestamp)+', '
+            data[ip]['timestamp']=output[:-1]
+      return data
+
+class LocationInfo:
+   def __init__(self, ip:str='127.0.0.1', api_key:str='aaabbbcccdddeee1112_123fg', query:str='lunch', radius:int=0):
       """
       The following class, takes an IP address, and then using Google's API generates a rough calculation of which
       places accessed the site. This is done using a query (specify the type of location), and radius (how far from the
@@ -255,13 +241,15 @@ class LocationInfo:
          gmaps:str - Google's API key to use Google Maps API (https://developers.google.com/maps/documentation/javascript/get-api-key)
          query: str - The type of location to check. 
          radius:int - In meters how far from source to check  
+         api_key:str - Google's Maps API key 
       """
       self.ip = ip
       self.gmaps = googlemaps.Client(key=api_key)
-      self.query = query 
+      self.query = query
       self.radius = radius
+      self.api_key=api_key
 
-   def _get_lat_long(self) -> (float, float): 
+   def get_lat_long(self) -> str:
       """
       This function connects to the FreeGeoIP web service to get info from IP addresses.
       Returns two latitude and longitude.
@@ -273,51 +261,46 @@ class LocationInfo:
          Return the address and lat/long of each IP accesseing dianomic
          if there is an error then code returns lat/long
       """
-      lat = 0.0
-      long = 0.0
+      self.lat = 0.0
+      self.long = 0.0
       r = requests.get("https://freegeoip.net/json/" + self.ip)
       json_response = r.json()
       if json_response['latitude'] and json_response['longitude']:
-         lat = json_response['latitude']
-         long = json_response['longitude']
-      return lat, long
+         self.lat = json_response['latitude']
+         self.long = json_response['longitude']
+      return "("+str(self.lat)+","+str(self.long)+")"
 
-   def _get_address(self, lat:float=0.0, long:float=0.0) -> str: 
+   def get_address(self):
       """
       Based on the latitude and longitutde, generate address
       :return:
          return address:str
       """
-      try: 
-         address = self.gmaps.reverse_geocode((lat, long))
-      except googlemaps.exceptions._RetriableRequest: 
-         return "Failed to get Address due to API Key limit. For more info: https://developers.google.com/maps/documentation/javascript/get-api-key" 
-      except googlemaps.exceptions.Timeout: 
+      try:
+         address = self.gmaps.reverse_geocode((self.lat, self.long))
+      except googlemaps.exceptions._RetriableRequest:
+         return "Failed to get Address due to API Key limit. For more info: https://developers.google.com/maps/documentation/javascript/get-api-key"
+      except googlemaps.exceptions.Timeout:
          return "Failed to get Address due to API Key timeout. For more info: https://developers.google.com/maps/documentation/javascript/get-api-key"
-      else: 
+      else:
          try:
-            return address[0]['formatted_address']
+            return str(address[0]['formatted_address']).replace("'","").replace('"','')
          except:
             return ''
 
-   def _get_possible_places(self, lat:float=0.0, long:float=0.0, query:str="lunch") -> str:
+   def get_possible_places(self) -> str:
       """
       Generate a list of places based on the lcation, query, and radius (in meters)
       :args: 
-         query:str - what the user is searching for
       :return:
          "list" of potential places based on query 
       """
       result = ""
-      try: 
-         places = self.gmaps.places(query=self.query, location=(lat, long), radius=self.radius)
-      except: 
-         return "Failed to get potential %s places due to API Key limit. For more info: https://developers.google.com/maps/documentation/javascript/get-api-key" % query
-      else: 
+      try:
+         places = self.gmaps.places(query=self.query, location=(self.lat, self.long), radius=self.radius)
+      except:
+         return "Failed to get potential %s places due to API Key limit. For more info: https://developers.google.com/maps/documentation/javascript/get-api-key" % self.query
+      else:
          for dict in places['results']:
             result += dict['name'].replace("'","").replace('"',"") + ", "
-         return result
-
-if __name__ == "__main__": 
-   m = Main() 
-   m.aws_main()
+         return result[:-2]

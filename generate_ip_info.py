@@ -4,10 +4,12 @@ import pymysql
 import re 
 import requests
 import threading
+import warnings
 
 from json import dumps
 from pygeocoder import Geocoder
 
+warnings.filterwarnings("ignore")
 
 class GenerateIPBasedInfo: 
    def __init__(self, cur:pymysql.cursors.Cursor=None, file_name:str='/tmp/output.txt', source='NewSource', 
@@ -25,9 +27,9 @@ class GenerateIPBasedInfo:
       self.c = cur 
       self.file_name = file_name
       self.source=source 
-      self.api_key=api
+      self.api_key=api_key
       self.query=query
-      self.radius=raidus 
+      self.radius=radius 
 
    def download_ip(self): 
       """
@@ -79,22 +81,27 @@ class GenerateIPBasedInfo:
       """
       check_row="SELECT COUNT(*) FROM ip_data WHERE ip='%s' AND source='%s';"
       insert_stmt=("INSERT INTO ip_data(create_timestamp, update_timestamp, ip, source, total_access, access_times, coordiantes, address, places) VALUES " 
-                  +"('%s', NOW(), '%s', '%s', %s, '%s', '%s', '%s', '%s');")
-      update_stmt="UPDATE ip_data SET  update_timestamp=NOW(), total_access=%s, access_times='%s' WHERE ip='%s' AND source='%s';"
+                  +"('%s', '%s', '%s', '%s', %s, '%s', '%s', '%s', '%s');")
+
+      update_stmt="UPDATE ip_data SET  update_timestamp='%s', total_access=%s, access_times='%s' WHERE ip='%s' AND source='%s';"
 
       for ip in self.ip_data.keys():
          self.c.execute(check_row % (ip, self.source))
          if self.c.fetchall()[0][0] == 0:
-            stmt = insert_stmt % (sorted(self.ip_data[ip]['timestamp'])[0], ip, self.source, len(self.ip_data[ip]['timestamp']),
-                                  self._convert_timestamp(sorted(self.ip_data[ip]['timestamp'])), self.ip_data[ip]['coordinates'], 
-                                  self.ip_data[ip]['address'], self.ip_data[ip]['places'])
+            stmt = insert_stmt % (sorted(self.ip_data[ip]['timestamp'])[0], sorted(self.ip_data[ip]['timestamp'])[-1], ip, self.source, 
+                                  len(self.ip_data[ip]['timestamp']), self._convert_timestamp(sorted(self.ip_data[ip]['timestamp'])), 
+                                  self.ip_data[ip]['coordinates'], self.ip_data[ip]['address'], self.ip_data[ip]['places'])
             try:
                self.c.execute(stmt)
-            except UnicodeEncodeError:
+            except:
                pass
          else:
-            stmt = update_stmt % (len(self.ip_data[ip]['timestamp']), self._convert_timestamp(sorted(self.ip_data[ip]['timestamp'])), ip, self.source)
-            self.c.execute(stmt)
+            stmt = update_stmt % (sorted(self.ip_data[ip]['timestamp'])[-1], len(self.ip_data[ip]['timestamp']), 
+                                  self._convert_timestamp(sorted(self.ip_data[ip]['timestamp'])), ip, self.source)
+            try: 
+               self.c.execute(stmt)
+            except: 
+               pass 
 
    def _convert_timestamp(self, timestamps:list=[]) -> str:
       """
@@ -113,39 +120,32 @@ class GenerateIPBasedInfo:
       """
       Send data generated from file into downloads table 
       """
-      count_stmt = "SELECT MAX(total_download) FROM downloads WHERE create_timestamp <= NOW();" 
-      insert_stmt = "INSERT INTO downloads(create_timestamp, source, repo, daily_download, total_download) VALUES ('%s', '%s', '', %s, %s);" 
+      insert_stmt = "INSERT INTO downloads(create_timestamp, source, repo, daily_download) VALUES ('%s', '%s', '', %s);" 
       check_stmt = "SELECT COUNT(*) FROM downloads WHERE DATE(create_timestamp) = DATE('%s') AND source='%s';" 
 
       for timestamp in self.timestamp_data: 
-         self.c.execute(count_stmt) 
-         total = self.c.fetchall()[0][0] 
-         if total is None: 
-            total = 0
          self.c.execute(check_stmt % (timestamp, self.source))
          count = self.c.fetchall()[0][0]
          if count == 0: 
-            stmt = insert_stmt % (timestamp, self.source, len(self.timestamp_data[timestamp]), len(self.timestamp_data[timestamp])+total)
+            stmt = insert_stmt % (timestamp, self.source, len(self.timestamp_data[timestamp]))
             self.c.execute(stmt)
 
    def _send_to_traffic(self):
       """
       Generate data generated from file into traffic table 
       """ 
-      count_stmt = "SELECT MAX(total_traffic) FROM traffic WHERE create_timestamp <= NOW();"
-      insert_stmt = "INSERT INTO traffic(create_timestamp, source, repo, daily_traffic, total_traffic) VALUES ('%s', '%s', '', %s, %s);"
+      insert_stmt = "INSERT INTO traffic(create_timestamp, source, repo, daily_traffic) VALUES ('%s', '%s', '', %s);"
       check_stmt = "SELECT COUNT(*) FROM traffic WHERE DATE(create_timestamp) = DATE('%s') AND source='%s';"
 
       for timestamp in self.timestamp_data:
-         self.c.execute(count_stmt)
-         total = self.c.fetchall()[0][0]
-         if total is None:
-            total = 0
          self.c.execute(check_stmt % (timestamp, self.source))
          count = self.c.fetchall()[0][0]
          if count == 0:
-            stmt = insert_stmt % (timestamp, self.source, len(self.timestamp_data[timestamp]), len(self.timestamp_data[timestamp])+total)
-            self.c.execute(stmt)
+            stmt = insert_stmt % (timestamp, self.source, len(self.timestamp_data[timestamp]))
+            try: 
+               self.c.execute(stmt)
+            except: 
+               pass
 
 
 class InfoFromFile:

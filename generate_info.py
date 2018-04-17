@@ -1,9 +1,12 @@
 import psycopg2
 import pymysql 
 import sys 
+import warnings 
 
 from generate_ip_info     import GenerateIPBasedInfo
 from generate_github_info import GenerateGitHubInfo
+
+warnings.filterwarnings("ignore")
 
 class GenerateInfo: 
    def __init__(self, *args): 
@@ -135,7 +138,7 @@ class GenerateInfo:
 
    def main(self): 
       if self.source.lower() in ['aws', 'website']: 
-         gii = GenerateIPBasedInfo(cur=self.c, file_name=self.file_name, source=self.source, api=self.api_key, query=self.query, radius=self.radius) 
+         gii = GenerateIPBasedInfo(cur=self.c, file_name=self.file_name, source=self.source, api_key=self.api_key, query=self.query, radius=self.radius) 
          if self.downloads is True: 
             gii.download_ip() 
          if self.traffic is True: 

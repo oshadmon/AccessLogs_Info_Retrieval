@@ -1,5 +1,8 @@
 import requests
 import pymysql 
+import warnings 
+
+warnings.filterwarnings("ignore")
 
 class GenerateGitHubInfo:
    def __init__(self, cur:pymysql.cursors.Cursor=None, auth=('user@githbu.com', 'pass'), org='NewOrg', repo='NewRepo'):
@@ -63,16 +66,10 @@ class GenerateGitHubInfo:
       :args:
          data:dict - github referral insight 
       """
-      insert_stmt = "INSERT INTO github_referral_list(repo, referral, daily_referrals, total_referrals) VALUES ('%s',  '%s', %s, %s);"
-      count_query = "SELECT MAX(total_referrals) FROM github_referral_list;"
+      insert_stmt = "INSERT INTO github_referral_list(repo, referral, daily_referrals) VALUES ('%s',  '%s', %s);"
 
       for referral in data:
-         stmt = count_query % (self.repo, referral['referrer'])
-         self.c.execute(stmt)
-         total_referrals = self.c.fetchall()[0][0]
-         if total_referrals is None:
-            total_referrals = 0
-         stmt = insert_stmt % (self.repo, referral['referrer'], referral['uniques'], referral['uniques']+total_referrals)
+         stmt = insert_stmt % (self.repo, referral['referrer'], referral['uniques'])
          self.c.execute(stmt)
 
 class GitHub:

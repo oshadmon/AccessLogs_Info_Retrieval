@@ -104,7 +104,7 @@ class GenerateGraph:
       Based on a user defined query, containing 2 rows (1 for x and another for y) generate 
       a table containing the corresponding data, and the sum of y incrementally
       """
-      self.query = "SELECT DATE(create_timestamp), SUM(daily_download) FROM downloads WHERE source='AWS' GROUP BY DATE(create_timestamp);" 
+      self.query = "SELECT source, SUM(daily_download) FROM downloads GROUP BY source;" 
       insert = "INSERT INTO data(xaxy, daily, total) VALUES('%s', %s, %s);"
       self.c.execute(self.query) 
       results = self.c.fetchall()
@@ -165,13 +165,43 @@ class GenerateGraph:
      f = open('/var/www/html/aws.html', 'a') 
      f.write("<body><div><center>"+self.query+"</center></div></body>")
 
+   def draw_horizontal_bar_graph(self): 
+     """
+     Based on the results in the table, graph the output
+     :args: 
+        columns:dict - Dictionary of columns that are being used. 
+                       Note that 0 key in columns is the X-axy, all else relate to Y-axy
+        layout:Layout - Layout of graph 
+        names:list - List of trace names 
+     """
+     yaxy = self.query.split("SELECT")[-1].split(",",1)[0].replace(" ","")
+     xaxy = "count"
+     columns = self._retrieve_data()
+     trace_names = ['daily', 'total']
+     # Generate trace lines
+     traces = []
+     for key in range(1, len(columns)):
+        traces.append(Bar(x=columns[key], y=columns[0], name=trace_names[key-1], orientation='h'))
+     # Layout 
+     layout = Layout(
+           title='Graph 1',
+           xaxis=dict(title=xaxy),
+           yaxis=dict(title=yaxy),
+     )
+
+     # Draw 
+     data = Data(traces)
+     fig = Figure(data=data, layout=layout)
+     offline.plot(fig, filename='/var/www/html/source.html')
+
    def main(self):
       """
       Main to generate graphs from data
       """
       self.create_temp_table()
       self.insert_to_temp_table()
-      self.draw_line_graph() 
+      # self.draw_line_graph() 
+      self.draw_horizontal_bar_graph() 
  
 if __name__ == '__main__': 
    gg = GenerateGraph()

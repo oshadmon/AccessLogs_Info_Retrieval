@@ -13,10 +13,9 @@ class GenerateGraph:
       :args: 
          args  (sys.argv):list - Valules declared when calling test (shown in _help method)
       """
-      if "--help" in sys.argv:
-         self._help()
-      self._declare_values(values=sys.argv)
-
+      conn = pymysql.connect(host='127.0.0.1', user='root', password='foglamp', db='test', autocommit=True, charset='latin1')
+      self.c = conn.cursor()
+ 
    def _help(self, invalid:str=''):
       """
       Print options to screen and exit
@@ -36,6 +35,17 @@ class GenerateGraph:
            )
       exit(1)
 
+   def create_temp_table(self): 
+      """
+      Create temporary table from which graphs will be generated 
+      """
+      create_table=("CREATE TEMPORARY TABLE data("
+                   +"xaxy VARCHAR(255) NOT NULL DEFAULT '',"
+                   +"daily FLOAT NOT NULL DEFAULT 0.0,"
+                   +"total FLOAT NOT NULL DEFAULT 0.0"
+                   +");") 
+      self.c.execute(create_table)
+
    def _declare_values(self, values:list=[]): 
       """
       Declare values that are used through the program
@@ -49,7 +59,7 @@ class GenerateGraph:
          type:str - type of graph (
       """
       self.file="/var/www/html"
-      self.query = "SELECT * FROM table;"
+      # self.query = "SELECT * FROM table;"
       self.title = "chart name"
       self.host = '127.0.0.1'
       self.usr = 'root'
@@ -78,21 +88,45 @@ class GenerateGraph:
          else:
             self._help(invalid=value)
 
-   def retrieve_data(self) -> dict: 
+   def create_temp_table(self):
       """
-      Retrieve data from database based on a given query 
+      Create temporary table from which graphs will be generated 
+      """
+      create_table=("CREATE TEMPORARY TABLE data("
+                   +"xaxy VARCHAR(255) NOT NULL DEFAULT '',"
+                   +"daily FLOAT NOT NULL DEFAULT 0.0,"
+                   +"total FLOAT NOT NULL DEFAULT 0.0"
+                   +");") 
+      self.c.execute(create_table)
+   
+   def insert_to_temp_table(self): 
+      """
+      Based on a user defined query, containing 2 rows (1 for x and another for y) generate 
+      a table containing the corresponding data, and the sum of y incrementally
+      """
+      self.query = "SELECT DATE(create_timestamp), SUM(daily_download) FROM downloads WHERE source='AWS' GROUP BY DATE(create_timestamp);" 
+      insert = "INSERT INTO data(xaxy, daily, total) VALUES('%s', %s, %s);"
+      self.c.execute(self.query) 
+      results = self.c.fetchall()
+      self.c.execute("SELECT COUNT(*) FROM data") 
+      total = 0
+      for result in results: 
+         total += result[1]
+         stmt = insert % (result[0], result[1], total)
+         self.c.execute(stmt)
+
+   def _retrieve_data(self) -> dict: 
+      """
+      Retrieve from data to send to graph 
       :return: 
-         Result of the query in a dictionary. Poisition 0 of the dictionary correlates to X, and all consequent rows correlate to Y
-      """ 
+         dict with data 
+      """
       results = []
-      # DB interaction
-      conn = pymysql.connect(host=self.host, user=self.usr, password=self.passwd, db=self.dbname, autocommit=True, charset='latin1')
-      c = conn.cursor() 
-      c.execute(self.query) 
-      for result in c.fetchall(): 
+      i = 0
+      self.c.execute("SELECT * FROM data ORDER BY xaxy;") 
+      for result in self.c.fetchall():
          results.append(result)
-      c.close() 
-      # Store results from database in dict (0 by default is X, and any consecutive number is the "Y" for that givne X
+      self.c.close() 
       column={}
       for v in range(len(results[0])):
         column[v]=[]
@@ -101,36 +135,7 @@ class GenerateGraph:
             column[key].append(result[key])
       return column
 
-   def trace_names(self) -> list: 
-      """
-      Based on the query generate values generate names of traces, and x-axy 
-
-      Example: SELECT column0, column1, column2 FROM table
-         - column0 correlates to X-axy name 
-         - column1 and column2 correlate to line names
-      :return:
-         Return the name of the x-axy and traces 
-      """  
-      traces=[]
-      xname=''
-      layout = None
-      # Generate names 
-      for column in self.query.lower().split("select")[-1].split("from")[0].split(","):
-         if xname is '': 
-            xname = column.split("(")[-1].split(")")[0].replace("`","")
-         else: 
-            traces.append(column.split("(")[-1].split(")")[0].replace("`",""))
-
-      return xname, traces
-                     
-   def _output_file(self): 
-      file_name=str(datetime.datetime.now().date()).replace("-","_")+"_"+self.title.replace(" ","_")+".html"
-      if "/" is self.file[-1]: 
-         self.file += file_name
-      else: 
-         self.file += "/"+file_name
-
-   def draw_line_graph(self, columns:dict={}, xname='', trace_names=[]): 
+   def draw_line_graph(self): 
      """
      Based on the results in the table, graph the output
      :args: 
@@ -139,61 +144,34 @@ class GenerateGraph:
         layout:Layout - Layout of graph 
         names:list - List of trace names 
      """ 
+     xaxy = self.query.split("SELECT")[-1].split(",",1)[0].replace(" ","")
+     yaxy = "count" 
+     columns = self._retrieve_data() 
+     trace_names = ['daily', 'total'] 
      # Generate trace lines
      traces = [] 
      for key in range(1, len(columns)): 
         traces.append(Scatter(x=columns[0], y=columns[key], name=trace_names[key-1])) 
      # Layout 
-     layout = Layout(
-                    title = self.title,
-                    xaxis = dict(title=xname)
-              )
-
+     layout = Layout( 
+           title='Graph 1',
+           xaxis=dict(title=xaxy), 
+           yaxis=dict(title=yaxy), 
+     )
      # Draw 
      data = Data(traces) 
      fig = Figure(data=data, layout=layout)
-     offline.plot(fig, filename=self.file)
-
-   def draw_hbar_graph(self, columns:dict={}, xname='', trace_names=[]):
-     """
-     Based on the results in the table, graph the output
-     :args: 
-        columns:dict - Dictionary of columns that are being used. 
-                       Note that 0 key in columns is the X-axy, all else relate to Y-axy
-        layout:Layout - Layout of graph 
-        names:list - List of trace names 
-     """
-     # Generate trace lines
-     traces = []
-     for key in range(1, len(columns)):
-        traces.append(Bar(x=columns[key], y=columns[0], name=trace_names[key-1], orientation='h'))
-     # Layout 
-     layout = Layout(
-                    title = self.title,
-                    yaxis = dict(title=xname)
-              )
-
-     # Draw 
-     data = Data(traces)
-     fig = Figure(data=data, layout=layout)
-     offline.plot(fig, filename=self.file)
-
+     offline.plot(fig, filename='/var/www/html/aws.html')
+     f = open('/var/www/html/aws.html', 'a') 
+     f.write("<body><div><center>"+self.query+"</center></div></body>")
 
    def main(self):
       """
       Main to generate graphs from data
       """
-      # Get data 
-      columns = self.retrieve_data()
-      # Get graph info 
-      xname, traces = self.trace_names() 
-      self._output_file() 
-      # draw graph  
-      if self.type == "line":
-         self.draw_line_graph(columns, xname, traces)  
-      elif self.type == "hbar": 
-         self.draw_hbar_graph(columns, xname, traces) 
-      
+      self.create_temp_table()
+      self.insert_to_temp_table()
+      self.draw_line_graph() 
  
 if __name__ == '__main__': 
    gg = GenerateGraph()

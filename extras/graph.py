@@ -1,6 +1,7 @@
 import datetime 
 import os
 import plotly.offline as offline
+import psycopg2
 import pymysql
 import sys 
 
@@ -13,10 +14,17 @@ class GenerateGraph:
       :args: 
          args  (sys.argv):list - Valules declared when calling test (shown in _help method)
       """
-      if "--help" in sys.argv:
-         self._help()
-      self._declare_values(values=sys.argv)
-
+      if "--help" in sys.argv: 
+         self._help() 
+      self._get_values(sys.argv) 
+      if self.psql is True:
+         conn = psycopg2.connect(host=self.host, port=self.port, user=self.user, password=self.password, dbname=self.db)
+         conn.autocommit = True
+         self.c.cursor()
+      else: 
+         conn = pymysql.connect(host=self.host, port=self.port, user=self.user, password=self.passwd, db=self.db, autocommit=True, charset='latin1')
+         self.c = conn.cursor()
+ 
    def _help(self, invalid:str=''):
       """
       Print options to screen and exit
@@ -26,73 +34,121 @@ class GenerateGraph:
       if invalid is not "":
          print("Exception - '%s' is not supported\n" % str(invalid))
       print("Option List: "
-           +"\n\t--file: location where image is stored [--file=/var/www/html]"
-           +"\n\t--title: name of the graph [--title='chart name']" 
+           +"\n\t--host: IP address of the PostgresSQL [--host=127.0.0.1:3306]"
+           +"\n\t--user: User and password to connect to postgres [--usr=root:'passwd']"
+           +"\n\t--db: Name of database being used [--db-name=test]"
+           +"\n\t--psql: use PostgresSQL instead of MySQL" 
+           +"\n\t--file: location where image will be stored [--file=/var/www/html]"
            +"\n\t--type: Type of graph (line or hbar) [--type=line]"
-           +"\n\t--query: The type of location to check [--query='SELECT * FROM table;']"
-           +"\n\t--host: IP address of the PostgresSQL [--host=127.0.0.1]"
-           +"\n\t--usr: User and password to connect to postgres [--usr=root:'']"
-           +"\n\t--db-name: Name of database being used [--db-name=test]"
+           +"\n\t--title: name of the graph [--title='chart name']" 
+           +"\n\t--query: SELECT statement (containing an X and Y) [--query='SELECT create_timestamp, daily_data FROM table ORDER BY create_timestamp;']"
+           +"\n\t--total-only: For line graphs don't show daily results" 
+           +"\n\t--daily-only: For line graphs don't show cumulative  results"  
+           +"\n\tIn the case that both --total-only and --daily-only are enabled, the data generates 2 seperate graphs"
            )
       exit(1)
 
-   def _declare_values(self, values:list=[]): 
+   def _get_values(self, values:list=[]):
       """
-      Declare values that are used through the program
-      :args:
-         file:str - File logs file containing relevent information
-         title:str - Name of the graph generated 
-         query:str - The type of location to check.
-         host:str - IP address of the PostgresSQL
-         user:str - User of MySQL 
-         dbname:str - database name  
-         type:str - type of graph (
+      Decalare values used in script
+      :args: 
+         self.host:str        - database IP address 
+         self.port:int        - database port address 
+         self.user:str        - database user 
+         self.passwd:str      - database password 
+         self.db:str          - database name 
+         self.psql            - use PostgresSQL instead of MySQL
+         self.file:str        - file in which graph will be stored 
+                                Note, Plot.ly rewrites file rather than append 
+         self.title:str       - Graph title
+         self.type:str        - Graph type (either line or bar graph) 
+         self.query:str       - Query against the original table to generate graphs 
+         self.total_only:bool - generate only cumulative results 
+         self.daily_only:nool - generate only non-cumulative results   
       """
-      self.file="/var/www/html"
-      self.query = "SELECT * FROM table;"
-      self.title = "chart name"
-      self.host = '127.0.0.1'
-      self.usr = 'root'
-      self.passwd = ''
-      self.dbname = 'test'
-      self.type='line' 
-
-      for value in values:
-         if value is sys.argv[0]:
-            pass
+      self.host = '127.0.0.1' 
+      self.port = 3306 
+      self.user = 'root' 
+      self.passwd = 'passwd'
+      self.db = 'test' 
+      self.psql = False
+      self.file = '/var/www/html'
+      self.title = 'Graph 1' 
+      self.type = 'line' 
+      self.query = 'SELECT create_timestamp, daily_data FROM table ORDER BY create_timestamp;'
+      self.total_only = True # if true don't generate none cumulative results 
+      self.daily_only = True # if true don't generate cumulative results
+      
+      for value in values: 
+         if value is sys.argv[0]: 
+            pass 
+         elif "--host" in value: 
+            self.host = str(value.split("=")[-1].split(":")[0]) 
+            if ":" in value:
+               self.prot = str(value.split("=")[-1].split(":")[-1]) 
+         elif "--user" in value: 
+            self.user   = str(value.split("=")[-1].split(":")[0])
+            self.passwd = str(value.split("=")[-1].split(":")[-1]) 
+         elif "--db" in value: 
+            self.db = str(value.split("=")[-1]) 
+         elif "--psql" in value: 
+            self.psql = True
          elif "--file" in value: 
-            self.file = str(value.split("=")[-1])
-         elif "--title" in value:
-            self.title = str(value.split("=")[-1]) 
-         elif "--query" in value:
-            self.query = str(value.split("=",1)[-1]) 
-         elif "--host" in value:
-            self.host = str(value.split("=")[-1])
-         elif "--usr" in value:
-            self.usr = str(value.split("=")[-1].split(":")[0])
-            self.passwd = str(value.split("=")[-1].split(":")[-1])
-         elif "--db-name" in value:
-            self.dbname = str(value.split("=")[-1])
+            self.file = str(value.split("=")[-1]) 
          elif "--type" in value: 
             self.type = str(value.split("=")[-1])
-         else:
-            self._help(invalid=value)
-
-   def retrieve_data(self) -> dict: 
+         elif "--title" in value: 
+            self.title = str(value.split("=")[-1]) 
+         elif "--query" in value: 
+            self.query = str(value.split("=",1)[-1])
+         elif "--total-only" in value: 
+            self.daily_only = False 
+         elif "--daily-only" in value: 
+            self.total_only = False 
+         else: 
+            self._help(value) 
+         
+   def create_temp_table(self): 
       """
-      Retrieve data from database based on a given query 
+      Create temporary table from which graphs will be generated 
+      """
+      create_table = ("CREATE TEMPORARY TABLE data(" 
+                     +"\n\txaxy VARCHAR(255) DEFAULT ''," 
+                     +"\n\tdaily FLOAT NOT NULL DEFAULT 0.0,"
+                     +"\n\ttotal FLOAT NOT NULL DEFAULT 0.0\n);"
+                     )
+      self.c.execute(create_table)
+   
+   def insert_to_temp_table(self): 
+      """
+      Based on a user defined query, containing 2 rows (1 for x and another for y) generate 
+      a table containing the corresponding data, and the sum of y incrementally
+      """
+      #self.query = "SELECT source, SUM(daily_download) FROM downloads GROUP BY source;" 
+      insert = "INSERT INTO data(xaxy, daily, total) VALUES('%s', %s, %s);"
+      self.c.execute(self.query) 
+      results = self.c.fetchall()
+      self.c.execute("SELECT COUNT(*) FROM data") 
+      total = 0
+      for result in results: 
+         total += result[1]
+         stmt = insert % (result[0], result[1], total)
+         self.c.execute(stmt)
+
+   def _retrieve_data(self, query:str='') -> dict: 
+      """
+      Retrieve from data to send to graph 
+      :args: 
+         query:str - query to be executed
       :return: 
-         Result of the query in a dictionary. Poisition 0 of the dictionary correlates to X, and all consequent rows correlate to Y
-      """ 
+         dict with data 
+      """
       results = []
-      # DB interaction
-      conn = pymysql.connect(host=self.host, user=self.usr, password=self.passwd, db=self.dbname, autocommit=True, charset='latin1')
-      c = conn.cursor() 
-      c.execute(self.query) 
-      for result in c.fetchall(): 
+      i = 0
+      self.c.execute(query) 
+      for result in self.c.fetchall():
          results.append(result)
-      c.close() 
-      # Store results from database in dict (0 by default is X, and any consecutive number is the "Y" for that givne X
+      self.c.close() 
       column={}
       for v in range(len(results[0])):
         column[v]=[]
@@ -101,36 +157,7 @@ class GenerateGraph:
             column[key].append(result[key])
       return column
 
-   def trace_names(self) -> list: 
-      """
-      Based on the query generate values generate names of traces, and x-axy 
-
-      Example: SELECT column0, column1, column2 FROM table
-         - column0 correlates to X-axy name 
-         - column1 and column2 correlate to line names
-      :return:
-         Return the name of the x-axy and traces 
-      """  
-      traces=[]
-      xname=''
-      layout = None
-      # Generate names 
-      for column in self.query.lower().split("select")[-1].split("from")[0].split(","):
-         if xname is '': 
-            xname = column.split("(")[-1].split(")")[0].replace("`","")
-         else: 
-            traces.append(column.split("(")[-1].split(")")[0].replace("`",""))
-
-      return xname, traces
-                     
-   def _output_file(self): 
-      file_name=str(datetime.datetime.now().date()).replace("-","_")+"_"+self.title.replace(" ","_")+".html"
-      if "/" is self.file[-1]: 
-         self.file += file_name
-      else: 
-         self.file += "/"+file_name
-
-   def draw_line_graph(self, columns:dict={}, xname='', trace_names=[]): 
+   def draw_line_graph(self): 
      """
      Based on the results in the table, graph the output
      :args: 
@@ -139,22 +166,37 @@ class GenerateGraph:
         layout:Layout - Layout of graph 
         names:list - List of trace names 
      """ 
+     xaxy = self.query.split("SELECT")[-1].split(",",1)[0].replace(" ","")
+     yaxy = "count" 
+     file_name = str(datetime.datetime.now()).split(" ")[0].replace("-","_")+"_"+self.title.replace(" ", "_")+".html"
+     trace_names = [] 
+     if self.daily_only is True and self.total_only is False: 
+        columns = self._retrieve_data("SELECT xaxy, daily FROM data ORDER BY xaxy;")
+        trace_names = ['daily']
+     elif self.total_only is True and self.daily_only is False: 
+        columns = self._retrieve_data("SELECT xaxy, total FROM data ORDER BY xaxy;") 
+        trace_names = ['total'] 
+     else: 
+        columns = self._retrieve_data("SELECT xaxy, daily, total FROM data ORDER BY xaxy;")
+        trace_names = ['daily', 'total'] 
      # Generate trace lines
      traces = [] 
      for key in range(1, len(columns)): 
         traces.append(Scatter(x=columns[0], y=columns[key], name=trace_names[key-1])) 
      # Layout 
-     layout = Layout(
-                    title = self.title,
-                    xaxis = dict(title=xname)
-              )
-
+     layout = Layout( 
+           title=self.title,
+           xaxis=dict(title=xaxy), 
+           yaxis=dict(title=yaxy), 
+     )
      # Draw 
      data = Data(traces) 
      fig = Figure(data=data, layout=layout)
-     offline.plot(fig, filename=self.file)
+     offline.plot(fig, filename=self.file+"/"+file_name)
+     f = open(self.file+"/"+file_name, 'a') 
+     f.write("<body><div><center>"+self.query+"</center></div></body>")
 
-   def draw_hbar_graph(self, columns:dict={}, xname='', trace_names=[]):
+   def draw_horizontal_bar_graph(self): 
      """
      Based on the results in the table, graph the output
      :args: 
@@ -163,37 +205,38 @@ class GenerateGraph:
         layout:Layout - Layout of graph 
         names:list - List of trace names 
      """
+     yaxy = self.query.split("SELECT")[-1].split(",",1)[0].replace(" ","")
+     xaxy = "count"
+     columns = self._retrieve_data(self.query)
+     file_name = str(datetime.datetime.now()).split(" ")[0].replace("-","_")+"_"+self.title.replace(" ", "_")+".html"
      # Generate trace lines
      traces = []
      for key in range(1, len(columns)):
-        traces.append(Bar(x=columns[key], y=columns[0], name=trace_names[key-1], orientation='h'))
+        traces.append(Bar(x=columns[key], y=columns[0], orientation='h'))
      # Layout 
      layout = Layout(
-                    title = self.title,
-                    yaxis = dict(title=xname)
-              )
+           title=self.title,
+           xaxis=dict(title=xaxy),
+           yaxis=dict(title=yaxy),
+     )
 
      # Draw 
      data = Data(traces)
      fig = Figure(data=data, layout=layout)
-     offline.plot(fig, filename=self.file)
-
+     offline.plot(fig, filename=self.file+"/"+file_name)
+     f = open(self.file+"/"+file_name, 'a')
+     f.write("<body><div><center>"+self.query+"</center></div></body>")
 
    def main(self):
       """
       Main to generate graphs from data
       """
-      # Get data 
-      columns = self.retrieve_data()
-      # Get graph info 
-      xname, traces = self.trace_names() 
-      self._output_file() 
-      # draw graph  
-      if self.type == "line":
-         self.draw_line_graph(columns, xname, traces)  
-      elif self.type == "hbar": 
-         self.draw_hbar_graph(columns, xname, traces) 
-      
+      if self.type == 'hbar': 
+         self.draw_horizontal_bar_graph() 
+      elif self.type == 'line':
+         self.create_temp_table()
+         self.insert_to_temp_table()
+         self.draw_line_graph() 
  
 if __name__ == '__main__': 
    gg = GenerateGraph()

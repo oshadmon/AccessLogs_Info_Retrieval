@@ -127,7 +127,7 @@ class GenerateInfo:
            +"\n\t--org: Organization that repo falls under (if none then uses GitHub username) [--org=NewOrg]" 
            +"\n\t--repo: GitHub Repository Name                                                [--repo=NewRepo]"
            +"\n\nFile based insight" 
-           +"\n\t--fine-name: file name and path with insight                                  [--file-name=$HOME/tmp.txt]" 
+           +"\n\t--file-name: file name and path with insight                                  [--file-name=$HOME/tmp.txt]" 
            +"\n\t--api-key: Google's API Key                                                   [--api-key=AAABBBCCC-123]" 
            +"\n\t--query: Category location falls under                                        [--query='lunch spot']"
            +"\n\t--radius: Distance from origin                                                [--radius=0]" 

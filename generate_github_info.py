@@ -33,14 +33,9 @@ class GenerateGitHubInfo:
       :args: 
          data:dict - traffic insight  
      """
-      insert_stmt = "INSERT INTO traffic(repo, source, daily_traffic, total_traffic) VALUES ('%s', 'GitHub', %s, %s);"
-      count_query = "SELECT MAX(total_traffic) FROM traffic WHERE repo='%s' AND source='GitHub';"
+      insert_stmt = "INSERT INTO traffic(repo, source, daily_traffic) VALUES ('%s', 'GitHub', %s);"
 
-      self.c.execute(count_query % self.repo)
-      total_download = self.c.fetchall()[0][0]
-      if total_download is None:
-         total_download = 0
-      stmt = insert_stmt % (self.repo, data['uniques'], data['uniques']+total_download)
+      stmt = insert_stmt % (self.repo, data['uniques']) 
       self.c.execute(stmt)
 
    def _send_to_download(self, data:dict={}):
@@ -49,15 +44,9 @@ class GenerateGitHubInfo:
       :args: 
          data:dict - downloads insight 
       """
-      insert_stmt = "INSERT INTO downloads(repo, source, daily_download, total_download) VALUES ('%s', 'GitHub', %s, %s);"
-      count_query = "SELECT MAX(total_download) FROM downloads WHERE repo='%s' AND source='GitHub';"
+      insert_stmt = "INSERT INTO downloads(repo, source, daily_download) VALUES ('%s', 'GitHub', %s);"
 
-      self.c.execute(count_query % self.repo)
-      total_download = self.c.fetchall()[0][0]
-
-      if total_download is None:
-         total_download = 0
-      stmt = insert_stmt % (self.repo, data['uniques'], data['uniques']+total_download)
+      stmt = insert_stmt % (self.repo, data['uniques'])
       self.c.execute(stmt)
 
    def _send_to_github_referral_list(self, data:dict={}):

@@ -1,6 +1,7 @@
 import datetime 
 import os
 import plotly.offline as offline
+import psycopg2
 import pymysql
 import sys 
 
@@ -16,8 +17,13 @@ class GenerateGraph:
       if "--help" in sys.argv: 
          self._help() 
       self._get_values(sys.argv) 
-      conn = pymysql.connect(host=self.host, port=self.port, user=self.user, password=self.passwd, db=self.db, autocommit=True, charset='latin1')
-      self.c = conn.cursor()
+      if self.psql is True:
+         conn = psycopg2.connect(host=self.host, port=self.port, user=self.user, password=self.password, dbname=self.db)
+         conn.autocommit = True
+         self.c.cursor()
+      else: 
+         conn = pymysql.connect(host=self.host, port=self.port, user=self.user, password=self.passwd, db=self.db, autocommit=True, charset='latin1')
+         self.c = conn.cursor()
  
    def _help(self, invalid:str=''):
       """
@@ -31,6 +37,7 @@ class GenerateGraph:
            +"\n\t--host: IP address of the PostgresSQL [--host=127.0.0.1:3306]"
            +"\n\t--user: User and password to connect to postgres [--usr=root:'passwd']"
            +"\n\t--db: Name of database being used [--db-name=test]"
+           +"\n\t--psql: use PostgresSQL instead of MySQL" 
            +"\n\t--file: location where image will be stored [--file=/var/www/html]"
            +"\n\t--type: Type of graph (line or hbar) [--type=line]"
            +"\n\t--title: name of the graph [--title='chart name']" 
@@ -50,6 +57,7 @@ class GenerateGraph:
          self.user:str        - database user 
          self.passwd:str      - database password 
          self.db:str          - database name 
+         self.psql            - use PostgresSQL instead of MySQL
          self.file:str        - file in which graph will be stored 
                                 Note, Plot.ly rewrites file rather than append 
          self.title:str       - Graph title
@@ -63,6 +71,7 @@ class GenerateGraph:
       self.user = 'root' 
       self.passwd = 'passwd'
       self.db = 'test' 
+      self.psql = False
       self.file = '/var/www/html'
       self.title = 'Graph 1' 
       self.type = 'line' 
@@ -82,6 +91,8 @@ class GenerateGraph:
             self.passwd = str(value.split("=")[-1].split(":")[-1]) 
          elif "--db" in value: 
             self.db = str(value.split("=")[-1]) 
+         elif "--psql" in value: 
+            self.psql = True
          elif "--file" in value: 
             self.file = str(value.split("=")[-1]) 
          elif "--type" in value: 

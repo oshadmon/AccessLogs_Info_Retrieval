@@ -33,7 +33,7 @@ Option List:
 ```
 * graph.py Execute
 ```
-~/AccessLogs_Info_Retrieval/extras$ python3 graph.py --host='127.0.0.1:3306' --user=root:'AccessLogs_Info_Retrieval' --db=test --query="SELECT DATE(create_timestamp), SUM(daily_download) FROM downloads GROUP BY DATE(create_timestamp) ORDER BY DATE(create_timestamp);" --type=line --title="Downloads over Time" --file=/var/www/html/
+~/AccessLogs_Info_Retrieval/extras$ python3 graph.py --host='127.0.0.1:3306' --user=root:passwd --db=test --query="SELECT DATE(create_timestamp), SUM(daily_download) FROM downloads GROUP BY DATE(create_timestamp) ORDER BY DATE(create_timestamp);" --type=line --title="Downloads over Time" --file=/var/www/html/
 ```
 ![downloads](https://user-images.githubusercontent.com/7193201/39894644-64559b38-545c-11e8-891b-0f94d90fc1ce.png)
 

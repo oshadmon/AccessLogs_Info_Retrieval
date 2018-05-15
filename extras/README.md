@@ -24,7 +24,7 @@ Option List:
 	--db: Name of database being used [--db-name=test]
 	--psql: use PostgresSQL instead of MySQL
 	--file: location where image will be stored [--file=/var/www/html]
-	--type: Type of graph (line or hbar) [--type=line]
+	--type: Types of graph (line, hbar, pie) [--type=line]
 	--title: name of the graph [--title='chart name']
 	--query: SELECT statement (containing an X and Y) [--query='SELECT create_timestamp, daily_data FROM table ORDER BY create_timestamp;']
 	--total-only: For line graphs don't show daily results

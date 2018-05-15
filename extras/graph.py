@@ -6,6 +6,7 @@ import pymysql
 import sys 
 
 from plotly.graph_objs import *
+import plotly.plotly as py 
 
 class GenerateGraph: 
    def __init__(self, *args): 
@@ -39,7 +40,7 @@ class GenerateGraph:
            +"\n\t--db: Name of database being used [--db-name=test]"
            +"\n\t--psql: use PostgresSQL instead of MySQL" 
            +"\n\t--file: location where image will be stored [--file=/var/www/html]"
-           +"\n\t--type: Type of graph (line or hbar) [--type=line]"
+           +"\n\t--type: Types of graph (line, hbar, pie) [--type=line]"
            +"\n\t--title: name of the graph [--title='chart name']" 
            +"\n\t--query: SELECT statement (containing an X and Y) [--query='SELECT create_timestamp, daily_data FROM table ORDER BY create_timestamp;']"
            +"\n\t--total-only: For line graphs don't show daily results" 
@@ -195,6 +196,7 @@ class GenerateGraph:
      offline.plot(fig, filename=self.file+"/"+file_name)
      f = open(self.file+"/"+file_name, 'a') 
      f.write("<body><div><center>"+self.query+"</center></div></body>")
+     f.close()
 
    def draw_horizontal_bar_graph(self): 
      """
@@ -226,6 +228,47 @@ class GenerateGraph:
      offline.plot(fig, filename=self.file+"/"+file_name)
      f = open(self.file+"/"+file_name, 'a')
      f.write("<body><div><center>"+self.query+"</center></div></body>")
+     f.close() 
+
+   def draw_pie_graph(self): 
+      """
+      Based on results in the table, graph the output as pie graph
+      :args: 
+         data:dcit - Dictionary containing both labels and values being used 
+      """
+      file_name = str(datetime.datetime.now()).split(" ")[0].replace("-","_")+"_"+self.title.replace(" ", "_")+".html"
+      data = self._retrieve_data(self.query)
+      fig = {
+         'data': [
+            {
+               'labels': data[0], 
+               'values': data[1], 
+               'type': 'pie', 
+               'name': self.title, 
+               'hoverinfo': 'label+percent', 
+               'textinfo': 'none',
+               'marker': { 
+                  'colors': ['rgb(151, 154, 154)',
+                             'rgb(217, 136, 128)',  
+                             'rgb(230, 176, 170)', 
+                             'rgb(242, 215, 213)',
+                             'rgb(245, 183, 177)',
+                             'rgb(249, 215, 213)',
+                             'rgb(249, 235, 234)',
+                             'rgb(250, 219, 216)',
+                             'rgb(253, 237, 236)'
+                  ]
+               }
+         }], 
+         'layout': {
+            'title': self.title,
+            'showlegend': True
+         }
+      }
+      offline.plot(fig, filename=self.file+"/"+file_name)
+      f = open(self.file+"/"+file_name, 'a')
+      f.write("<body><div><center>"+self.query+"</center></div></body>")
+      f.close()
 
    def main(self):
       """
@@ -237,7 +280,13 @@ class GenerateGraph:
          self.create_temp_table()
          self.insert_to_temp_table()
          self.draw_line_graph() 
+      elif self.type == 'pie': 
+         self.create_temp_table()
+         self.insert_to_temp_table()
+         self.draw_pie_graph()
  
 if __name__ == '__main__': 
    gg = GenerateGraph()
    gg.main()
+
+

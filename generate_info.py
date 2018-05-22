@@ -19,7 +19,7 @@ class GenerateInfo:
       if self.psql is True: 
          conn = psycopg2.connect(host=self.host, port=self.port, user=self.user, password=self.password, dbname=self.db) 
          conn.autocommit = True
-         self.c.cursor() 
+         self.c = conn.cursor() 
       else: 
          conn = pymysql.connect(host=self.host, port=self.port,  user=self.user, password=self.password, db=self.db, autocommit=True)
          self.c = conn.cursor()

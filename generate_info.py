@@ -143,10 +143,6 @@ class GenerateInfo:
             gii.download_ip() 
          if self.traffic is True: 
             gii.traffic_ip() 
-
-      if self.source.lower() == 'github':
-         gh = GenerateGitHubInfo(cur=self.c, auth=self.auth, org=self.org, repo=self.repo) 
-         gh.github() 
          
 
 
